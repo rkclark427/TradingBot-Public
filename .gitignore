@@ -211,6 +211,7 @@ data/
 logs/
 *.db
 *.db-journal
+.env.draft
 
 # PyPI configuration file
 .pypirc

@@ -8,20 +8,37 @@ JSON fields are Text; serialization is handled by the repo layer.
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import (
-    Boolean,
-    Date,
-    DateTime,
-    ForeignKey,
-    Integer,
-    Numeric,
-    String,
-    Text,
-)
+from sqlalchemy import Boolean, Date, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import DateTime as _DateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.types import TypeDecorator
+
+
+class TZDateTime(TypeDecorator[datetime]):
+    """DateTime that always returns UTC-aware datetimes from SQLite.
+
+    SQLite stores datetimes without timezone info. This decorator strips tzinfo
+    on write (normalising to UTC first) and re-attaches UTC on read, so all
+    datetime values in the application are always tz-aware.
+    """
+
+    impl = _DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, dialect: object) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is not None:
+            return value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value
+
+    def process_result_value(self, value: datetime | None, dialect: object) -> datetime | None:
+        if value is None:
+            return None
+        return value.replace(tzinfo=timezone.utc)
 
 
 class Base(DeclarativeBase):
@@ -43,7 +60,7 @@ class SleeveRow(Base):
     starting_capital: Mapped[Decimal] = mapped_column(Numeric(20, 10), nullable=False)
     current_nav: Mapped[Decimal] = mapped_column(Numeric(20, 10), nullable=False)
     high_water_mark: Mapped[Decimal] = mapped_column(Numeric(20, 10), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime(), nullable=False)
     parameters_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
@@ -52,7 +69,7 @@ class SleeveCapitalEventRow(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     sleeve_id: Mapped[str] = mapped_column(String, ForeignKey("sleeves.id"), nullable=False)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(TZDateTime(), nullable=False)
     event_type: Mapped[str] = mapped_column(String, nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(20, 10), nullable=False)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -67,7 +84,7 @@ class SignalRow(Base):
     __tablename__ = "signals"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(TZDateTime(), nullable=False)
     sleeve_id: Mapped[str] = mapped_column(String, ForeignKey("sleeves.id"), nullable=False)
     symbol: Mapped[str] = mapped_column(String, nullable=False)
     target_weight: Mapped[Decimal] = mapped_column(Numeric(20, 10), nullable=False)
@@ -83,7 +100,7 @@ class IntendedOrderRow(Base):
     __tablename__ = "intended_orders"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(TZDateTime(), nullable=False)
     sleeve_id: Mapped[str] = mapped_column(String, ForeignKey("sleeves.id"), nullable=False)
     symbol: Mapped[str] = mapped_column(String, nullable=False)
     side: Mapped[str] = mapped_column(String, nullable=False)
@@ -96,7 +113,7 @@ class NetOrderRow(Base):
     __tablename__ = "net_orders"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(TZDateTime(), nullable=False)
     mode: Mapped[str] = mapped_column(String, nullable=False)
     symbol: Mapped[str] = mapped_column(String, nullable=False)
     side: Mapped[str] = mapped_column(String, nullable=False)
@@ -130,7 +147,7 @@ class FillRow(Base):
     net_order_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("net_orders.id"), nullable=False
     )
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(TZDateTime(), nullable=False)
     qty: Mapped[Decimal] = mapped_column(Numeric(20, 10), nullable=False)
     fill_price: Mapped[Decimal] = mapped_column(Numeric(20, 10), nullable=False)
     fees: Mapped[Decimal] = mapped_column(Numeric(20, 10), nullable=False)
@@ -199,7 +216,7 @@ class RiskEventRow(Base):
     __tablename__ = "risk_events"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(TZDateTime(), nullable=False)
     level: Mapped[str] = mapped_column(String, nullable=False)
     sleeve_id_nullable: Mapped[str | None] = mapped_column(
         String, ForeignKey("sleeves.id"), nullable=True
@@ -213,7 +230,7 @@ class SystemEventRow(Base):
     __tablename__ = "system_events"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(TZDateTime(), nullable=False)
     event_type: Mapped[str] = mapped_column(String, nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     context_json: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -233,7 +250,7 @@ class AssetUniverseRow(Base):
     marginable: Mapped[bool] = mapped_column(Boolean, nullable=False)
     shortable: Mapped[bool] = mapped_column(Boolean, nullable=False)
     etb: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    last_refreshed: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_refreshed: Mapped[datetime] = mapped_column(TZDateTime(), nullable=False)
 
 
 class AccountCapabilitiesRow(Base):
@@ -253,4 +270,4 @@ class HeartbeatRow(Base):
     __tablename__ = "heartbeat"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(TZDateTime(), nullable=False)

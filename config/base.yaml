@@ -1,0 +1,29 @@
+env: development
+
+data:
+  alpaca_feed: iex
+  bars_cache_dir: data/bars
+
+execution:
+  limit_offset_bps: 10
+  min_order_notional: 1.0
+  fill_poll_interval_seconds: 30
+
+risk:
+  account_daily_loss_pct: 0.05
+  account_drawdown_pct: 0.20
+  account_max_orders_per_day: 100
+  account_max_orders_per_minute: 20
+  sleeve_daily_loss_pct: 0.03
+  sleeve_drawdown_pct: 0.15
+  sleeve_max_position_pct: 0.30
+  sleeve_max_order_pct: 0.50
+
+orchestrator:
+  cycle_interval_seconds: 60
+  market_open_buffer_minutes: 5
+  market_close_buffer_minutes: 15
+
+logging:
+  level: INFO
+  dir: logs

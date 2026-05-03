@@ -1,0 +1,14 @@
+universe:
+  - XLF
+  - XLE
+  - XLI
+  - XLV
+  - XLP
+  - XLU
+  - XLB
+  - XLRE
+  - XLY
+  - XLK
+  - XLC
+lookback_days: 63
+top_n: 3

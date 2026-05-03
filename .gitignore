@@ -207,8 +207,8 @@ tempCodeRunnerFile.py
 .ruff_cache/
 
 # Project-specific
-data/
-logs/
+/data/
+/logs/
 *.db
 *.db-journal
 .env.draft

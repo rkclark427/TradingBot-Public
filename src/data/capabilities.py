@@ -61,7 +61,7 @@ def load_capabilities_from_db(
 ) -> AccountCapabilities | None:
     """Reconstruct AccountCapabilities from the most recent DB snapshot."""
     repo = AccountCapabilitiesRepo(session)
-    all_rows = repo.get_all()
+    all_rows = repo.get_all_rows()
     if not all_rows:
         return None
 

@@ -80,3 +80,6 @@ class AccountCapabilitiesRepo:
             .filter(AccountCapabilitiesRow.snapshot_date == snapshot_date)
             .all()
         )
+
+    def get_all_rows(self) -> list[AccountCapabilitiesRow]:
+        return list(self._session.query(AccountCapabilitiesRow).all())

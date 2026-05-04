@@ -145,8 +145,13 @@ class Orchestrator:
     # Single cycle
     # ------------------------------------------------------------------
 
-    def run_once(self) -> dict[str, Any]:
-        """Run one orchestration cycle. Returns a summary dict."""
+    def run_once(self, force: bool = False) -> dict[str, Any]:
+        """Run one orchestration cycle. Returns a summary dict.
+
+        Args:
+            force: Skip the market-hours check. Useful for testing outside
+                   market hours. Orders are still subject to all other checks.
+        """
         now = datetime.now(tz=timezone.utc)
         result: dict[str, Any] = {
             "timestamp": now.isoformat(),
@@ -168,17 +173,20 @@ class Orchestrator:
             result.update(skipped=True, skip_reason="no_client")
             return result
 
-        try:
-            clock = clock_client.get_clock()
-        except Exception:
-            logger.exception("Failed to get market clock; skipping cycle")
-            result.update(skipped=True, skip_reason="clock_error")
-            return result
+        if not force:
+            try:
+                clock = clock_client.get_clock()
+            except Exception:
+                logger.exception("Failed to get market clock; skipping cycle")
+                result.update(skipped=True, skip_reason="clock_error")
+                return result
 
-        if not clock.is_open:
-            logger.debug("Market closed; skipping cycle")
-            result.update(skipped=True, skip_reason="market_closed")
-            return result
+            if not clock.is_open:
+                logger.debug("Market closed; skipping cycle")
+                result.update(skipped=True, skip_reason="market_closed")
+                return result
+        else:
+            logger.info("Market hours check bypassed (--force)")
 
         asset_universe = {
             row.symbol: row.tradable

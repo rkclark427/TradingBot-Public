@@ -313,7 +313,14 @@ def sleeves_stop(sleeve_id: str = typer.Argument(..., help="Sleeve UUID")) -> No
 
 
 @app.command()
-def run() -> None:
+def run(
+    force: bool = typer.Option(
+        False, "--force", help="Bypass market-hours check (useful for testing outside hours)."
+    ),
+    once: bool = typer.Option(
+        False, "--once", help="Run a single cycle then exit instead of looping."
+    ),
+) -> None:
     """Start the orchestrator loop (blocks until Ctrl-C)."""
     with _app_context() as (config, session, paper_client, live_client, manager):
         from src.orchestrator import Orchestrator
@@ -325,7 +332,26 @@ def run() -> None:
             live_client=live_client,
             sleeve_manager=manager,
         )
-        orch.run()
+        if once:
+            result = orch.run_once(force=force)
+            typer.echo(f"Cycle complete: {result}")
+        else:
+            if force:
+                typer.echo("WARNING: market-hours check bypassed (--force)", err=True)
+            # Patch the instance so the loop also uses force mode
+            import time as _time
+            orch.run_startup_checks()
+            interval = config.orchestrator.cycle_interval_seconds
+            try:
+                while True:
+                    try:
+                        orch.run_once(force=force)
+                    except Exception:
+                        import logging as _logging
+                        _logging.getLogger(__name__).exception("Unexpected error in cycle")
+                    _time.sleep(interval)
+            except KeyboardInterrupt:
+                typer.echo("Orchestrator stopped.")
 
 
 # ---------------------------------------------------------------------------

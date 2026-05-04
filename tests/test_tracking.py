@@ -79,6 +79,7 @@ def sleeve(session, sleeve_id):
         status="running",
         starting_capital=Decimal("500.00"),
         current_nav=Decimal("500.00"),
+        current_cash=Decimal("500.00"),
         high_water_mark=Decimal("500.00"),
         created_at=NOW,
         parameters_json=None,
@@ -114,6 +115,7 @@ def test_sleeve_create_and_get(session, sleeve_id):
         status="running",
         starting_capital=Decimal("1000.00"),
         current_nav=Decimal("1050.00"),
+        current_cash=Decimal("1050.00"),
         high_water_mark=Decimal("1050.00"),
         created_at=NOW,
         parameters_json='{"lookback": 5}',
@@ -147,6 +149,7 @@ def test_sleeve_update_nav(session, sleeve):
     updated = repo.update_nav(
         sleeve.id,
         current_nav=Decimal("550.00"),
+        current_cash=Decimal("550.00"),
         high_water_mark=Decimal("550.00"),
     )
     session.commit()

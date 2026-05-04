@@ -229,6 +229,7 @@ def _make_filled_order_info(
 ) -> MagicMock:
     info = MagicMock()
     info.id = alpaca_id
+    info.status = "filled"
     info.symbol = symbol
     info.filled_qty = filled_qty
     info.filled_avg_price = fill_price

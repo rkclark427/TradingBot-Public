@@ -74,7 +74,7 @@ def submit_intended_orders(
     alpaca_ids: list[str] = []
     date_str = as_of.strftime("%Y%m%d")
 
-    for sequence, (symbol, group) in enumerate(grouped.items(), start=1):
+    for symbol, group in grouped.items():
         # Net buys against sells within the group.
         net_qty = Decimal("0")
         for order, _ in group:
@@ -98,8 +98,32 @@ def submit_intended_orders(
         sleeve = sleeve_manager.get_sleeve(group[0][0].sleeve_id)
         mode = sleeve.mode.value if sleeve is not None else "paper"
 
-        # Idempotent client_order_id.
-        client_order_id = f"{date_str}-{symbol}-{sequence}"
+        # Persist net order first (status=pending) so we get a DB-assigned id
+        # before submission. This id is used in client_order_id to guarantee
+        # global uniqueness even when two sleeves trade the same symbol on the same day.
+        net_row = net_repo.create(
+            timestamp=as_of,
+            mode=mode,
+            symbol=symbol,
+            side=net_side,
+            net_qty=abs_net_qty,
+            limit_price=limit_price,
+            alpaca_id=None,
+            status="pending",
+        )
+        # net_repo.create() calls session.flush(), so net_row.id is assigned here.
+
+        # Persist intended → net mappings before submission so they're never lost.
+        for order, intended_row in group:
+            allocated = order.qty
+            mapping_repo.create(
+                intended_order_id=intended_row.id,
+                net_order_id=net_row.id,
+                allocated_qty=allocated,
+            )
+
+        # client_order_id uses net_row.id — globally unique and stable for retry.
+        client_order_id = f"{date_str}-{symbol}-{net_row.id}"
 
         # Submit to Alpaca.
         try:
@@ -117,27 +141,9 @@ def submit_intended_orders(
             alpaca_id = None
             net_status = "error"
 
-        # Persist net order.
-        net_row = net_repo.create(
-            timestamp=as_of,
-            mode=mode,
-            symbol=symbol,
-            side=net_side,
-            net_qty=abs_net_qty,
-            limit_price=limit_price,
-            alpaca_id=alpaca_id,
-            status=net_status,
-        )
-
-        # Persist intended → net mappings.
-        for order, intended_row in group:
-            # Allocate the portion of the net qty that came from this order.
-            allocated = order.qty
-            mapping_repo.create(
-                intended_order_id=intended_row.id,
-                net_order_id=net_row.id,
-                allocated_qty=allocated,
-            )
+        # Update net order with Alpaca result.
+        net_row.alpaca_id = alpaca_id
+        net_row.status = net_status
 
         session.commit()
 

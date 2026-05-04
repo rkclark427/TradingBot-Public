@@ -55,9 +55,12 @@ def run_pre_trade_checks(
         reasons.append(f"symbol {order.symbol} is not tradable")
 
     # 3. Order size relative to sleeve NAV.
+    # Guard against orders larger than the sleeve itself (bug protection).
+    # Full-allocation strategies (e.g. BuyAndHoldSPY at 100% weight) are valid;
+    # the real risk is accidentally ordering 200%+ of NAV.
     order_notional = order.qty * order.limit_price
-    if order_notional > sleeve.current_nav * Decimal("0.50"):
-        reasons.append("order exceeds 50% of sleeve NAV")
+    if order_notional > sleeve.current_nav * Decimal("1.0"):
+        reasons.append("order exceeds 100% of sleeve NAV")
 
     return reasons
 

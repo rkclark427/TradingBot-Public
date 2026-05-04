@@ -102,33 +102,32 @@ def test_symbol_not_in_universe_rejected() -> None:
 
 
 def test_oversized_order_rejected() -> None:
-    """Order notional > 50% of sleeve NAV should be rejected."""
+    """Order notional > 100% of sleeve NAV should be rejected."""
     sleeve = _make_sleeve(Decimal("10000"))
-    # 10000 * 0.50 = 5000; order notional = 60 * 100 = 6000 > 5000
-    order = _make_order(symbol="SPY", qty=Decimal("60"), limit_price=Decimal("100"))
+    # order notional = 101 * 100 = 10100 > 10000 (100% of NAV)
+    order = _make_order(symbol="SPY", qty=Decimal("101"), limit_price=Decimal("100"))
     reasons = run_pre_trade_checks(order, sleeve, _UNIVERSE_SPY_TRADABLE, kill_switch=False)
-    assert any("50%" in r for r in reasons)
+    assert any("100%" in r for r in reasons)
 
 
-def test_order_exactly_at_50pct_passes() -> None:
-    """Order notional exactly equal to 50% NAV should pass (strictly greater than fails)."""
+def test_order_exactly_at_100pct_passes() -> None:
+    """Order notional exactly equal to 100% NAV should pass (strictly greater than rejects)."""
     sleeve = _make_sleeve(Decimal("10000"))
-    # notional = 50 * 100 = 5000 = exactly 50% of 10000
-    order = _make_order(symbol="SPY", qty=Decimal("50"), limit_price=Decimal("100"))
+    # notional = 100 * 100 = 10000 = exactly 100% of 10000
+    order = _make_order(symbol="SPY", qty=Decimal("100"), limit_price=Decimal("100"))
     reasons = run_pre_trade_checks(order, sleeve, _UNIVERSE_SPY_TRADABLE, kill_switch=False)
-    # Should not contain a size rejection.
-    assert not any("50%" in r for r in reasons)
+    assert not any("100%" in r for r in reasons)
 
 
 def test_multiple_violations_reported() -> None:
     """Both tradability and size violations are reported together."""
     sleeve = _make_sleeve(Decimal("10"))
-    # Not in universe AND enormous order.
+    # Not in universe AND enormous order (notional = 100*100 = 10000 >> NAV of $10).
     order = _make_order(symbol="NOPE", qty=Decimal("100"), limit_price=Decimal("100"))
     reasons = run_pre_trade_checks(order, sleeve, {}, kill_switch=False)
     assert len(reasons) >= 2
     assert any("not tradable" in r for r in reasons)
-    assert any("50%" in r for r in reasons)
+    assert any("100%" in r for r in reasons)
 
 
 # ---------------------------------------------------------------------------

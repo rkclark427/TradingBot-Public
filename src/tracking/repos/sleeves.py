@@ -23,6 +23,7 @@ class SleeveRepo:
         status: str,
         starting_capital: Decimal,
         current_nav: Decimal,
+        current_cash: Decimal,
         high_water_mark: Decimal,
         created_at: datetime,
         parameters_json: str | None = None,
@@ -34,6 +35,7 @@ class SleeveRepo:
             status=status,
             starting_capital=starting_capital,
             current_nav=current_nav,
+            current_cash=current_cash,
             high_water_mark=high_water_mark,
             created_at=created_at,
             parameters_json=parameters_json,
@@ -60,12 +62,14 @@ class SleeveRepo:
         self,
         sleeve_id: str,
         current_nav: Decimal,
+        current_cash: Decimal,
         high_water_mark: Decimal,
     ) -> SleeveRow | None:
         row = self.get(sleeve_id)
         if row is None:
             return None
         row.current_nav = current_nav
+        row.current_cash = current_cash
         row.high_water_mark = high_water_mark
         self._session.flush()
         return row

@@ -60,6 +60,7 @@ class SleeveRow(Base):
     starting_capital: Mapped[Decimal] = mapped_column(Numeric(20, 10), nullable=False)
     current_nav: Mapped[Decimal] = mapped_column(Numeric(20, 10), nullable=False)
     high_water_mark: Mapped[Decimal] = mapped_column(Numeric(20, 10), nullable=False)
+    current_cash: Mapped[Decimal] = mapped_column(Numeric(20, 10), nullable=False, default=Decimal("0"))
     created_at: Mapped[datetime] = mapped_column(TZDateTime(), nullable=False)
     parameters_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 

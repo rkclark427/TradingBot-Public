@@ -165,7 +165,10 @@ def poll_fills(
     Returns:
         Count of new fills processed.
     """
-    filled_orders = client.get_orders(status="filled")
+    # "filled" is an order status, not a valid QueryOrderStatus filter value.
+    # Alpaca's query API accepts "open", "closed", or "all"; filter client-side.
+    all_closed = client.get_orders(status="closed")
+    filled_orders = [o for o in all_closed if o.status == "filled"]
 
     net_repo = NetOrderRepo(session)
     fill_repo = FillRepo(session)

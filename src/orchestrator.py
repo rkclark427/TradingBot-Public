@@ -55,10 +55,13 @@ class AlpacaMarketDataView:
         from alpaca.data.timeframe import TimeFrame
 
         now = datetime.now(tz=timezone.utc)
-        start = now - timedelta(days=7)
-        df = self._client.get_bars(symbol, TimeFrame.Day, start, now)
+        # Use yesterday as the end so we always ask for fully completed bars.
+        # Asking for "today" outside market hours can return empty on some feeds.
+        end = now - timedelta(days=1)
+        start = now - timedelta(days=10)
+        df = self._client.get_bars(symbol, TimeFrame.Day, start, end)
         if df.empty:
-            raise ValueError(f"No price data available for {symbol}")
+            raise ValueError(f"No price data available for {symbol} (feed returned no bars)")
         return Decimal(str(df["close"].iloc[-1]))
 
 
@@ -278,7 +281,7 @@ class Orchestrator:
             try:
                 current_prices[symbol] = market_data.get_latest_price(symbol)
             except Exception:
-                logger.warning("Could not get price for %s; skipping", symbol)
+                logger.warning("Could not get price for %s; skipping", symbol, exc_info=True)
 
         if not current_prices:
             logger.warning("No prices available for sleeve %s; skipping", sleeve.id)

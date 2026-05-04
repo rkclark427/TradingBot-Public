@@ -185,3 +185,34 @@ def test_check_and_filter_empty_input() -> None:
     passing, rejected = check_and_filter([], sleeve, {}, kill_switch=False)
     assert passing == []
     assert rejected == []
+
+
+# ---------------------------------------------------------------------------
+# Config-driven threshold tests
+# ---------------------------------------------------------------------------
+
+
+def test_tighter_threshold_rejects_order_default_would_pass() -> None:
+    """A lower max_nav_pct rejects an order the default 101% threshold would pass."""
+    sleeve = _make_sleeve(Decimal("10000"))
+    # notional = 10050; default 101% → 10100 limit → passes; 100% → 10000 limit → rejected
+    order = _make_order(symbol="SPY", qty=Decimal("1"), limit_price=Decimal("10050"))
+    assert not run_pre_trade_checks(order, sleeve, _UNIVERSE_SPY_TRADABLE, kill_switch=False)
+    reasons_tight = run_pre_trade_checks(
+        order, sleeve, _UNIVERSE_SPY_TRADABLE, kill_switch=False,
+        max_nav_pct=Decimal("1.0"),
+    )
+    assert any("100%" in r for r in reasons_tight)
+
+
+def test_looser_threshold_passes_order_default_would_reject() -> None:
+    """A higher max_nav_pct passes an order the default 101% threshold would reject."""
+    sleeve = _make_sleeve(Decimal("10000"))
+    # notional = 103 * 100 = 10300; default 101% → 10100 limit → rejected; 105% → 10500 → passes
+    order = _make_order(symbol="SPY", qty=Decimal("103"), limit_price=Decimal("100"))
+    assert run_pre_trade_checks(order, sleeve, _UNIVERSE_SPY_TRADABLE, kill_switch=False)
+    reasons_loose = run_pre_trade_checks(
+        order, sleeve, _UNIVERSE_SPY_TRADABLE, kill_switch=False,
+        max_nav_pct=Decimal("1.05"),
+    )
+    assert not reasons_loose

@@ -25,6 +25,7 @@ def run_pre_trade_checks(
     sleeve: Sleeve,
     asset_universe: dict[str, bool],
     kill_switch: bool,
+    max_nav_pct: Decimal = Decimal("1.01"),
 ) -> list[str]:
     """Evaluate pre-trade risk rules against a single order.
 
@@ -34,7 +35,7 @@ def run_pre_trade_checks(
     Phase 1 checks (in evaluation order):
         1. Kill switch — immediate blanket rejection.
         2. Symbol tradability — symbol must be present and tradable.
-        3. Order size — net notional must not exceed 50 % of sleeve NAV.
+        3. Order size — net notional must not exceed max_nav_pct of sleeve NAV.
 
     Args:
         order: The order to evaluate.
@@ -42,6 +43,11 @@ def run_pre_trade_checks(
         asset_universe: Mapping of symbol → is_tradable.
         kill_switch: When True, all orders are rejected regardless of other
             conditions.
+        max_nav_pct: Maximum allowed order notional as a fraction of sleeve NAV.
+            Default 1.01 (101%) accommodates the limit_offset_bps premium
+            (default 10bps = 0.1%) applied by the execution layer. Configurable
+            via risk.max_order_nav_pct. If you tune execution.limit_offset_bps,
+            tune this threshold accordingly.
     """
     reasons: list[str] = []
 
@@ -55,13 +61,11 @@ def run_pre_trade_checks(
         reasons.append(f"symbol {order.symbol} is not tradable")
 
     # 3. Order size relative to sleeve NAV.
-    # Guard against orders larger than the sleeve itself (bug protection).
-    # Threshold is 101% (not 100%) to accommodate the small bps offset applied
-    # to limit prices by the execution layer — the exposure check is about qty,
-    # not the fill-optimisation premium.
     order_notional = order.qty * order.limit_price
-    if order_notional > sleeve.current_nav * Decimal("1.01"):
-        reasons.append("order exceeds 101% of sleeve NAV")
+    threshold = sleeve.current_nav * max_nav_pct
+    if order_notional > threshold:
+        pct = int(max_nav_pct * 100)
+        reasons.append(f"order exceeds {pct}% of sleeve NAV")
 
     return reasons
 
@@ -76,6 +80,7 @@ def check_and_filter(
     sleeve: Sleeve,
     asset_universe: dict[str, bool],
     kill_switch: bool,
+    max_nav_pct: Decimal = Decimal("1.01"),
 ) -> tuple[list[IntendedOrder], list[dict]]:
     """Run pre-trade checks on a list of orders and partition the results.
 
@@ -84,6 +89,7 @@ def check_and_filter(
         sleeve: Current sleeve state.
         asset_universe: Tradability mapping.
         kill_switch: Global halt flag.
+        max_nav_pct: Max order notional as fraction of NAV. See run_pre_trade_checks.
 
     Returns:
         A 2-tuple ``(passing_orders, rejection_records)`` where each
@@ -94,7 +100,7 @@ def check_and_filter(
     rejected: list[dict] = []
 
     for order in orders:
-        reasons = run_pre_trade_checks(order, sleeve, asset_universe, kill_switch)
+        reasons = run_pre_trade_checks(order, sleeve, asset_universe, kill_switch, max_nav_pct)
         if reasons:
             rejected.append({"order": order, "reasons": reasons})
         else:

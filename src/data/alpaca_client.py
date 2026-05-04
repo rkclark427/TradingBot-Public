@@ -389,6 +389,19 @@ class _BaseClient:
         order = _with_retry(lambda: self._trading.submit_order(req))
         return _order_to_info(order)
 
+    def get_order_by_client_order_id(self, client_order_id: str) -> OrderInfo:
+        """Look up an order by the client-assigned order ID."""
+        order = _with_retry(lambda: self._trading.get_order_by_client_id(client_order_id))
+        return _order_to_info(order)
+
+    def cancel_order(self, order_id: str) -> None:
+        """Cancel a specific open order by its Alpaca UUID."""
+        _with_retry(lambda: self._trading.cancel_order_by_id(order_id))
+
+    def cancel_all_orders(self) -> None:
+        """Cancel all open orders for this account."""
+        _with_retry(lambda: self._trading.cancel_orders())
+
     # ------------------------------------------------------------------
     # Historical bars
     # ------------------------------------------------------------------

@@ -46,7 +46,6 @@ def _app_context(*, need_client: bool = True) -> Generator:
     from src.data.alpaca_client import PaperClient, LiveClient
     from src.data.capabilities import discover_account_capabilities, load_capabilities_from_db
     from src.sleeves.manager import SleeveManager
-    from src.tracking.models import Base
     from datetime import date
 
     config_dir = Path("config")
@@ -56,8 +55,25 @@ def _app_context(*, need_client: bool = True) -> Generator:
 
     config = load_config(config_dir)
     db_url = f"sqlite:///{config.secrets.db_path}"
+
+    # Use Alembic migrations to bootstrap/upgrade the schema.
+    # create_all is intentionally not used here — keep it in test fixtures only.
+    alembic_ini = Path("alembic.ini")
+    if not alembic_ini.exists():
+        typer.echo("Error: alembic.ini not found. Run from the project root.", err=True)
+        raise typer.Exit(1)
+    try:
+        from alembic.config import Config as AlembicConfig
+        from alembic import command as alembic_command
+
+        alembic_cfg = AlembicConfig(str(alembic_ini))
+        alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+        alembic_command.upgrade(alembic_cfg, "head")
+    except Exception as exc:
+        typer.echo(f"Error running database migrations: {exc}", err=True)
+        raise typer.Exit(1)
+
     engine = create_engine(db_url)
-    Base.metadata.create_all(engine)
 
     paper_client: PaperClient | None = None
     live_client: LiveClient | None = None
@@ -154,12 +170,38 @@ def status() -> None:
 
 
 @app.command()
-def kill() -> None:
-    """Activate the kill switch — halts order submission on the next cycle."""
+def kill(
+    cancel_open: bool = typer.Option(
+        False, "--cancel-open",
+        help="Cancel all open Alpaca orders before draining in-flight fills.",
+    ),
+    force: bool = typer.Option(
+        False, "--force",
+        help="Immediate exit with no cleanup. Last resort — state may be inconsistent.",
+    ),
+) -> None:
+    """Activate the kill switch. Default: graceful halt (drain in-flight fills then exit)."""
     from src.commands.kill_switch import activate
 
-    activate()
-    typer.echo("Kill switch activated. The bot will stop submitting orders.")
+    if force:
+        activate("force")
+        typer.echo(
+            "Kill switch activated (FORCE). Process exits on next cycle check.",
+            err=True,
+        )
+        typer.echo("WARNING: in-flight orders will NOT be reconciled.", err=True)
+    elif cancel_open:
+        activate("cancel_open")
+        typer.echo(
+            "Kill switch activated (cancel-open). Open Alpaca orders will be cancelled "
+            "before draining fills and exiting."
+        )
+    else:
+        activate("graceful")
+        typer.echo(
+            "Kill switch activated (graceful). In-flight orders will complete, "
+            "then the bot will exit cleanly."
+        )
 
 
 @app.command()
@@ -338,20 +380,8 @@ def run(
         else:
             if force:
                 typer.echo("WARNING: market-hours check bypassed (--force)", err=True)
-            # Patch the instance so the loop also uses force mode
-            import time as _time
-            orch.run_startup_checks()
-            interval = config.orchestrator.cycle_interval_seconds
-            try:
-                while True:
-                    try:
-                        orch.run_once(force=force)
-                    except Exception:
-                        import logging as _logging
-                        _logging.getLogger(__name__).exception("Unexpected error in cycle")
-                    _time.sleep(interval)
-            except KeyboardInterrupt:
-                typer.echo("Orchestrator stopped.")
+            orch.run(force=force)
+            typer.echo("Orchestrator stopped.")
 
 
 # ---------------------------------------------------------------------------
@@ -400,6 +430,51 @@ def refresh_capabilities() -> None:
         typer.echo(f"  shorting_enabled:  {caps.shorting_enabled}")
         typer.echo(f"  buying_power:      ${caps.buying_power:.2f}")
         typer.echo(f"  cash:              ${caps.cash:.2f}")
+
+
+# ---------------------------------------------------------------------------
+# bot-ctl db-status
+# ---------------------------------------------------------------------------
+
+
+@app.command("db-status")
+def db_status() -> None:
+    """Show current Alembic migration revision and whether the DB is up to date."""
+    from alembic.config import Config as AlembicConfig
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+    from src.config.loader import load_config
+
+    alembic_ini = Path("alembic.ini")
+    if not alembic_ini.exists():
+        typer.echo("Error: alembic.ini not found. Run from the project root.", err=True)
+        raise typer.Exit(1)
+
+    config_dir = Path("config")
+    if not config_dir.exists():
+        typer.echo("Error: config/ directory not found. Run from the project root.", err=True)
+        raise typer.Exit(1)
+
+    config = load_config(config_dir)
+    db_url = f"sqlite:///{config.secrets.db_path}"
+
+    alembic_cfg = AlembicConfig(str(alembic_ini))
+    alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+
+    script = ScriptDirectory.from_config(alembic_cfg)
+    head = script.get_current_head()
+
+    engine = create_engine(db_url)
+    with engine.connect() as conn:
+        context = MigrationContext.configure(conn)
+        current = context.get_current_revision()
+
+    up_to_date = current == head
+    typer.echo(f"Current revision: {current or '(none — DB not initialised)'}")
+    typer.echo(f"Head revision:    {head or '(none)'}")
+    typer.echo(f"Up to date:       {'yes' if up_to_date else 'NO — run bot-ctl (any command) to apply pending migrations'}")
+    if not up_to_date:
+        raise typer.Exit(1)
 
 
 # ---------------------------------------------------------------------------

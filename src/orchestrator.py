@@ -1,7 +1,7 @@
 """Orchestrator — main bot loop.
 
 Each cycle:
-  1. Kill switch check
+  1. Kill switch check (mode-aware: graceful / cancel_open / force)
   2. Market hours check
   3. For every running sleeve: generate targets → size → risk filter → submit
   4. Poll fills for both environments
@@ -22,11 +22,12 @@ from src.config.models import BaseConfig
 from src.data.alpaca_client import LiveClient, PaperClient
 from src.execution.router import poll_fills, submit_intended_orders
 from src.portfolio.sizer import targets_to_intended_orders
-from src.queries.kill_switch import is_kill_switch_active
+from src.queries.kill_switch import get_kill_switch_mode, is_kill_switch_active
 from src.risk.checks import check_and_filter
 from src.sleeves.manager import SleeveManager
 from src.sleeves.types import Mode, Sleeve
 from src.strategies.base import MarketDataView, Position, Strategy
+from src.tracking.models import NetOrderRow
 from src.tracking.repos.heartbeat import HeartbeatRepo
 from src.tracking.repos.market import AssetUniverseRepo
 from src.tracking.repos.positions import PositionRepo
@@ -129,15 +130,23 @@ class Orchestrator:
     # Main loop
     # ------------------------------------------------------------------
 
-    def run(self) -> None:
-        """Block indefinitely, running cycles until KeyboardInterrupt."""
+    def run(self, force: bool = False) -> None:
+        """Block indefinitely, running cycles until KeyboardInterrupt or kill switch."""
         logger.info("Orchestrator starting")
         self.run_startup_checks()
         interval = self._config.orchestrator.cycle_interval_seconds
         try:
             while True:
+                mode = get_kill_switch_mode()
+                if mode == "force":
+                    self._handle_force_exit()
+                    return
+                if mode in ("graceful", "cancel_open"):
+                    self._drain_fills(cancel_open=(mode == "cancel_open"))
+                    return
+
                 try:
-                    self.run_once()
+                    self.run_once(force=force)
                 except Exception:
                     logger.exception("Unexpected error in orchestration cycle")
                 time.sleep(interval)
@@ -311,8 +320,13 @@ class Orchestrator:
             else:
                 order.limit_price = (price * (1 - bps)).quantize(Decimal("0.01"))
 
+        max_nav_pct = Decimal(str(self._config.risk.max_order_nav_pct))
         passing, rejected = check_and_filter(
-            orders, sleeve, asset_universe, kill_switch=is_kill_switch_active()
+            orders,
+            sleeve,
+            asset_universe,
+            kill_switch=is_kill_switch_active(),
+            max_nav_pct=max_nav_pct,
         )
         for record in rejected:
             logger.warning(
@@ -330,6 +344,83 @@ class Orchestrator:
         )
         logger.info("Submitted %d order(s) for sleeve %s", len(alpaca_ids), sleeve.id)
         return len(alpaca_ids)
+
+    # ------------------------------------------------------------------
+    # Kill switch drain and force-exit
+    # ------------------------------------------------------------------
+
+    def _has_submitted_net_orders(self) -> bool:
+        return (
+            self._session.query(NetOrderRow)
+            .filter(NetOrderRow.status == "submitted")
+            .count()
+            > 0
+        )
+
+    def _drain_fills(self, cancel_open: bool = False) -> None:
+        """Poll fills until all submitted orders are terminal, then exit cleanly.
+
+        If cancel_open=True, cancels all open Alpaca orders first so DAY orders
+        don't need to wait until 4:00 PM ET to expire.
+        """
+        logger.info("Kill switch active — entering drain mode (cancel_open=%s)", cancel_open)
+
+        if cancel_open:
+            for client in [self._paper_client, self._live_client]:
+                if client is None:
+                    continue
+                try:
+                    client.cancel_all_orders()
+                    logger.info(
+                        "Cancelled all open orders (%s)",
+                        "paper" if client is self._paper_client else "live",
+                    )
+                except Exception:
+                    logger.exception("Failed to cancel all orders")
+
+        timeout = self._config.orchestrator.drain_timeout_seconds
+        deadline = datetime.now(tz=timezone.utc) + timedelta(seconds=timeout)
+
+        while datetime.now(tz=timezone.utc) < deadline:
+            if not self._has_submitted_net_orders():
+                logger.info("No submitted orders remaining — drain complete")
+                break
+
+            for client in [self._paper_client, self._live_client]:
+                if client is None:
+                    continue
+                try:
+                    poll_fills(client, self._session, self._sleeve_manager)
+                except Exception:
+                    logger.exception("poll_fills failed during drain")
+
+            now = datetime.now(tz=timezone.utc)
+            HeartbeatRepo(self._session).update(now)
+            self._session.commit()
+            time.sleep(30)
+        else:
+            logger.warning(
+                "Drain timed out after %ds — some submitted orders may be unreconciled",
+                timeout,
+            )
+
+        now = datetime.now(tz=timezone.utc)
+        HeartbeatRepo(self._session).update(now)
+        self._session.commit()
+        logger.info("Graceful halt complete. Exiting.")
+
+    def _handle_force_exit(self) -> None:
+        logger.warning(
+            "Kill switch FORCE mode. Exiting immediately. "
+            "In-flight orders and state may be inconsistent."
+        )
+        now = datetime.now(tz=timezone.utc)
+        try:
+            HeartbeatRepo(self._session).update(now)
+            self._session.commit()
+        except Exception:
+            logger.exception("Failed to write final heartbeat before force exit")
+        raise SystemExit(1)
 
     # ------------------------------------------------------------------
     # Helpers

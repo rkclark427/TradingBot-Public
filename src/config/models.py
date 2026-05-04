@@ -27,12 +27,16 @@ class RiskConfig(BaseModel):
     sleeve_drawdown_pct: float = 0.15
     sleeve_max_position_pct: float = 0.30
     sleeve_max_order_pct: float = 0.50
+    # Default 1.01 (101%) accommodates the limit_offset_bps (default 10bps = 0.1%)
+    # plus a small buffer. If you tune execution.limit_offset_bps, tune this too.
+    max_order_nav_pct: float = 1.01
 
 
 class OrchestratorConfig(BaseModel):
     cycle_interval_seconds: int = 60
     market_open_buffer_minutes: int = 5
     market_close_buffer_minutes: int = 15
+    drain_timeout_seconds: int = 600  # max time to wait for in-flight orders on graceful halt
 
 
 class LoggingConfig(BaseModel):

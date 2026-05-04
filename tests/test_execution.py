@@ -316,3 +316,107 @@ def test_poll_fills_ignores_unknown_alpaca_id(session: Session) -> None:
 
     assert count == 0
     mgr.attribute_fill.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Retry idempotency tests
+# ---------------------------------------------------------------------------
+
+
+def test_retry_reuses_existing_error_net_row(session: Session) -> None:
+    """On retry (same symbol/day), submit reuses the original error-status net_row."""
+    # First attempt: submission raises a transient network error.
+    client1 = MagicMock()
+    client1.submit_order.side_effect = Exception("connection timeout")
+    sleeve = _make_sleeve()
+    mgr = _make_sleeve_manager(session, sleeve)
+    order = _make_order(symbol="SPY", side="buy", qty=Decimal("5"), limit_price=Decimal("499"))
+
+    ids1 = submit_intended_orders([order], client1, session, mgr, _AS_OF)
+    assert ids1 == []
+
+    net_rows = session.query(NetOrderRow).all()
+    assert len(net_rows) == 1
+    first_net_id = net_rows[0].id
+    assert net_rows[0].status == "error"
+
+    # Second attempt: succeeds. Should reuse the original net_row.
+    client2 = _make_client("alp-retry-001")
+    ids2 = submit_intended_orders([order], client2, session, mgr, _AS_OF)
+    assert ids2 == ["alp-retry-001"]
+
+    # Only one net_row should exist — the retry reused it, not created a new one.
+    net_rows_after = session.query(NetOrderRow).all()
+    assert len(net_rows_after) == 1
+    assert net_rows_after[0].id == first_net_id
+
+    # Both attempts must use the same client_order_id for Alpaca deduplication.
+    expected_cid = f"20260503-SPY-{first_net_id}"
+    client2.submit_order.assert_called_once()
+    call_kwargs = client2.submit_order.call_args[1]
+    assert call_kwargs["client_order_id"] == expected_cid
+
+
+def test_two_sleeves_same_symbol_get_distinct_client_order_ids(session: Session) -> None:
+    """Two sleeves independently buying the same symbol in the same cycle
+    must produce distinct client_order_ids (no Alpaca uniqueness collision)."""
+    from uuid import UUID
+
+    from src.tracking.models import SleeveRow
+
+    sleeve_id_b = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    session.add(
+        SleeveRow(
+            id=sleeve_id_b,
+            strategy_name="buy_and_hold",
+            mode="paper",
+            status="running",
+            starting_capital=Decimal("10000"),
+            current_nav=Decimal("10000"),
+            high_water_mark=Decimal("10000"),
+            current_cash=Decimal("10000"),
+            created_at=_AS_OF,
+            parameters_json="{}",
+        )
+    )
+    session.commit()
+
+    sleeve_a = _make_sleeve()
+    sleeve_b = Sleeve(
+        id=UUID(sleeve_id_b),
+        strategy_name="buy_and_hold",
+        mode=Mode.PAPER,
+        status=SleeveStatus.RUNNING,
+        starting_capital=Decimal("10000"),
+        current_nav=Decimal("10000"),
+        high_water_mark=Decimal("10000"),
+        parameters={},
+        risk=SleeveRiskConfig(),
+        managed=False,
+        created_at=_AS_OF,
+    )
+
+    mgr = MagicMock()
+    mgr.get_sleeve.side_effect = lambda sid: sleeve_a if sid == _SLEEVE_ID else sleeve_b
+
+    client_a = _make_client("alp-a-001")
+    client_b = _make_client("alp-b-001")
+
+    order_a = IntendedOrder(
+        sleeve_id=_SLEEVE_ID, symbol="SPY", side="buy",
+        qty=Decimal("5"), limit_price=Decimal("499"),
+    )
+    order_b = IntendedOrder(
+        sleeve_id=sleeve_id_b, symbol="SPY", side="buy",
+        qty=Decimal("10"), limit_price=Decimal("499"),
+    )
+
+    ids_a = submit_intended_orders([order_a], client_a, session, mgr, _AS_OF)
+    ids_b = submit_intended_orders([order_b], client_b, session, mgr, _AS_OF)
+
+    assert ids_a == ["alp-a-001"]
+    assert ids_b == ["alp-b-001"]
+
+    cid_a = client_a.submit_order.call_args[1]["client_order_id"]
+    cid_b = client_b.submit_order.call_args[1]["client_order_id"]
+    assert cid_a != cid_b, f"Collision: both used client_order_id={cid_a!r}"

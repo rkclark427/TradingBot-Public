@@ -91,6 +91,42 @@ class NetOrderRepo:
         self._session.flush()
         return row
 
+    def find_error_for_retry(
+        self,
+        date_str: str,
+        symbol: str,
+        mode: str,
+    ) -> NetOrderRow | None:
+        """Find the oldest error-status net_order for this symbol/mode/date.
+
+        Used on retry to reuse the original row and its client_order_id, preventing
+        double-submission when the previous attempt may have reached Alpaca but
+        the response was lost to a network error.
+        """
+        from datetime import datetime, timedelta, timezone
+
+        date = datetime.strptime(date_str, "%Y%m%d").replace(tzinfo=timezone.utc)
+        return (
+            self._session.query(NetOrderRow)
+            .filter(
+                NetOrderRow.symbol == symbol,
+                NetOrderRow.mode == mode,
+                NetOrderRow.status == "error",
+                NetOrderRow.timestamp >= date,
+                NetOrderRow.timestamp < date + timedelta(days=1),
+            )
+            .order_by(NetOrderRow.id.asc())
+            .first()
+        )
+
+    def list_submitted(self) -> list[NetOrderRow]:
+        """Return all net_orders currently in 'submitted' state."""
+        return list(
+            self._session.query(NetOrderRow)
+            .filter(NetOrderRow.status == "submitted")
+            .all()
+        )
+
 
 class IntendedToNetRepo:
     def __init__(self, session: Session) -> None:
@@ -117,4 +153,12 @@ class IntendedToNetRepo:
             self._session.query(IntendedToNetRow)
             .filter(IntendedToNetRow.net_order_id == net_order_id)
             .all()
+        )
+
+    def delete_by_net_order(self, net_order_id: int) -> int:
+        """Delete all mappings for a net order. Returns count deleted."""
+        return (
+            self._session.query(IntendedToNetRow)
+            .filter(IntendedToNetRow.net_order_id == net_order_id)
+            .delete()
         )

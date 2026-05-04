@@ -102,21 +102,21 @@ def test_symbol_not_in_universe_rejected() -> None:
 
 
 def test_oversized_order_rejected() -> None:
-    """Order notional > 100% of sleeve NAV should be rejected."""
+    """Order notional > 101% of sleeve NAV should be rejected."""
     sleeve = _make_sleeve(Decimal("10000"))
-    # order notional = 101 * 100 = 10100 > 10000 (100% of NAV)
-    order = _make_order(symbol="SPY", qty=Decimal("101"), limit_price=Decimal("100"))
+    # order notional = 103 * 100 = 10300 > 10100 (101% of NAV)
+    order = _make_order(symbol="SPY", qty=Decimal("103"), limit_price=Decimal("100"))
     reasons = run_pre_trade_checks(order, sleeve, _UNIVERSE_SPY_TRADABLE, kill_switch=False)
-    assert any("100%" in r for r in reasons)
+    assert any("101%" in r for r in reasons)
 
 
-def test_order_exactly_at_100pct_passes() -> None:
-    """Order notional exactly equal to 100% NAV should pass (strictly greater than rejects)."""
+def test_order_within_limit_offset_buffer_passes() -> None:
+    """Order notional at 100.5% NAV passes — within the 1% bps-offset buffer."""
     sleeve = _make_sleeve(Decimal("10000"))
-    # notional = 100 * 100 = 10000 = exactly 100% of 10000
-    order = _make_order(symbol="SPY", qty=Decimal("100"), limit_price=Decimal("100"))
+    # notional = 1005 * 10 = 10050 = 100.5% of 10000 — inside the 101% threshold
+    order = _make_order(symbol="SPY", qty=Decimal("1005"), limit_price=Decimal("10"))
     reasons = run_pre_trade_checks(order, sleeve, _UNIVERSE_SPY_TRADABLE, kill_switch=False)
-    assert not any("100%" in r for r in reasons)
+    assert not any("101%" in r for r in reasons)
 
 
 def test_multiple_violations_reported() -> None:
@@ -127,7 +127,7 @@ def test_multiple_violations_reported() -> None:
     reasons = run_pre_trade_checks(order, sleeve, {}, kill_switch=False)
     assert len(reasons) >= 2
     assert any("not tradable" in r for r in reasons)
-    assert any("100%" in r for r in reasons)
+    assert any("101%" in r for r in reasons)
 
 
 # ---------------------------------------------------------------------------

@@ -56,11 +56,12 @@ def run_pre_trade_checks(
 
     # 3. Order size relative to sleeve NAV.
     # Guard against orders larger than the sleeve itself (bug protection).
-    # Full-allocation strategies (e.g. BuyAndHoldSPY at 100% weight) are valid;
-    # the real risk is accidentally ordering 200%+ of NAV.
+    # Threshold is 101% (not 100%) to accommodate the small bps offset applied
+    # to limit prices by the execution layer — the exposure check is about qty,
+    # not the fill-optimisation premium.
     order_notional = order.qty * order.limit_price
-    if order_notional > sleeve.current_nav * Decimal("1.0"):
-        reasons.append("order exceeds 100% of sleeve NAV")
+    if order_notional > sleeve.current_nav * Decimal("1.01"):
+        reasons.append("order exceeds 101% of sleeve NAV")
 
     return reasons
 

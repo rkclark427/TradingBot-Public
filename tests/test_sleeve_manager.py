@@ -189,15 +189,18 @@ def test_attribute_fill_buy_creates_position(manager: SleeveManager, session: Se
     assert Decimal(str(pos.qty)) == Decimal("0.5")
 
 
-def test_attribute_fill_buy_reduces_cash(manager: SleeveManager) -> None:
+def test_attribute_fill_buy_reduces_cash_not_nav(manager: SleeveManager) -> None:
+    # Buy: cash decreases, but position acquired at cost so NAV is unchanged (no fees).
     sleeve = manager.create_sleeve("buy_and_hold", "paper", Decimal("100"), {})
     manager.attribute_fill(str(sleeve.id), "SPY", "buy", Decimal("0.5"), Decimal("100"))
     updated = manager.get_sleeve(str(sleeve.id))
     assert updated is not None
-    assert updated.current_nav == Decimal("100") - Decimal("0.5") * Decimal("100")
+    assert updated.current_cash == Decimal("100") - Decimal("0.5") * Decimal("100")
+    assert updated.current_nav == Decimal("100")  # no fees, no P&L
 
 
-def test_attribute_fill_sell_increases_cash(manager: SleeveManager, session: Session) -> None:
+def test_attribute_fill_sell_captures_realized_pnl(manager: SleeveManager, session: Session) -> None:
+    # Sell at $110 with avg_cost $100: realized P&L = (110-100)*0.5 = $5.
     sleeve = manager.create_sleeve("buy_and_hold", "paper", Decimal("100"), {})
     PositionRepo(session).upsert(
         sleeve_id=str(sleeve.id), symbol="SPY", qty=Decimal("1"), avg_cost=Decimal("100")
@@ -205,7 +208,8 @@ def test_attribute_fill_sell_increases_cash(manager: SleeveManager, session: Ses
     manager.attribute_fill(str(sleeve.id), "SPY", "sell", Decimal("0.5"), Decimal("110"))
     updated = manager.get_sleeve(str(sleeve.id))
     assert updated is not None
-    assert updated.current_nav == Decimal("100") + Decimal("0.5") * Decimal("110")
+    assert updated.current_cash == Decimal("100") + Decimal("0.5") * Decimal("110")
+    assert updated.current_nav == Decimal("100") + Decimal("5")  # realized P&L
 
 
 # ------------------------------------------------------------------

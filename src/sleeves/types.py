@@ -133,6 +133,7 @@ class Sleeve:
     status: SleeveStatus
     starting_capital: Decimal
     current_nav: Decimal
+    current_cash: Decimal
     high_water_mark: Decimal
     parameters: dict[str, Any] = field(default_factory=dict)
     risk: SleeveRiskConfig = field(default_factory=SleeveRiskConfig)

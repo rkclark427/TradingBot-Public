@@ -28,6 +28,7 @@ def _make_sleeve(nav: Decimal = Decimal("10000")) -> Sleeve:
         status=SleeveStatus.RUNNING,
         starting_capital=nav,
         current_nav=nav,
+        current_cash=nav,
         high_water_mark=nav,
         parameters={},
         risk=SleeveRiskConfig(),

@@ -187,6 +187,9 @@ class SleeveManager:
         position_repo = PositionRepo(self._session)
         existing = position_repo.get(sleeve_id, symbol)
 
+        current_cash = Decimal(str(row.current_cash))
+        current_nav = Decimal(str(row.current_nav))
+
         if side == "buy":
             new_qty = (existing.qty if existing else Decimal("0")) + qty
             if existing:
@@ -195,19 +198,21 @@ class SleeveManager:
             else:
                 new_avg_cost = fill_price
             position_repo.upsert(sleeve_id=sleeve_id, symbol=symbol, qty=new_qty, avg_cost=new_avg_cost)
-            cash_delta = -(qty * fill_price) - fees
+            new_cash = current_cash - qty * fill_price - fees
+            # Position acquired at cost: no NAV change except fees
+            new_nav = current_nav - fees
         else:
             current_qty = existing.qty if existing else Decimal("0")
-            new_qty = current_qty - qty
             avg_cost = existing.avg_cost if existing else fill_price
+            new_qty = current_qty - qty
             if new_qty <= 0:
                 position_repo.upsert(sleeve_id=sleeve_id, symbol=symbol, qty=Decimal("0"), avg_cost=avg_cost)
             else:
                 position_repo.upsert(sleeve_id=sleeve_id, symbol=symbol, qty=new_qty, avg_cost=avg_cost)
-            cash_delta = (qty * fill_price) - fees
+            realized_pnl = (fill_price - avg_cost) * qty
+            new_cash = current_cash + qty * fill_price - fees
+            new_nav = current_nav + realized_pnl - fees
 
-        new_cash = Decimal(str(row.current_cash)) + cash_delta
-        new_nav = Decimal(str(row.current_nav)) + cash_delta
         new_hwm = max(Decimal(str(row.high_water_mark)), new_nav)
 
         SleeveRepo(self._session).update_nav(
@@ -254,6 +259,7 @@ def _row_to_sleeve(row: SleeveRow, managed: bool = False) -> Sleeve:
         status=SleeveStatus(row.status),
         starting_capital=Decimal(str(row.starting_capital)),
         current_nav=Decimal(str(row.current_nav)),
+        current_cash=Decimal(str(row.current_cash)),
         high_water_mark=Decimal(str(row.high_water_mark)),
         parameters=json.loads(row.parameters_json) if row.parameters_json else {},
         risk=SleeveRiskConfig(),

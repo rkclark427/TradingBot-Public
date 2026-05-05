@@ -34,6 +34,7 @@ class BuyAndHoldSPY(Strategy):
         market_data: MarketDataView,
         universe: list[str],
         as_of: datetime,
+        position_state: dict[str, dict[str, Any]] | None = None,
     ) -> list[Target]:
         symbol = params.get("symbol", "SPY")
 

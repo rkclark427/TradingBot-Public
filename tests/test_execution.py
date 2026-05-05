@@ -319,6 +319,62 @@ def test_poll_fills_ignores_unknown_alpaca_id(session: Session) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Canceled / expired order handling in poll_fills
+# ---------------------------------------------------------------------------
+
+
+def _make_canceled_order_info(alpaca_id: str, status: str = "canceled") -> MagicMock:
+    info = MagicMock()
+    info.id = alpaca_id
+    info.status = status
+    info.symbol = "SPY"
+    info.filled_qty = Decimal("0")
+    info.filled_avg_price = None
+    info.limit_price = Decimal("500")
+    info.filled_at = None
+    info.submitted_at = _AS_OF
+    return info
+
+
+def test_poll_fills_marks_canceled_net_order(session: Session) -> None:
+    """poll_fills marks a 'submitted' net_order as 'canceled' when Alpaca reports it canceled."""
+    client = _make_client("alp-cancel-001")
+    sleeve = _make_sleeve()
+    mgr = _make_sleeve_manager(session, sleeve)
+    order = _make_order()
+
+    submit_intended_orders([order], client, session, mgr, _AS_OF)
+    net_row = session.query(NetOrderRow).first()
+    assert net_row is not None
+    assert net_row.status == "submitted"
+
+    poll_client = MagicMock()
+    poll_client.get_orders.return_value = [_make_canceled_order_info("alp-cancel-001")]
+    poll_fills(poll_client, session, mgr)
+
+    session.refresh(net_row)
+    assert net_row.status == "canceled"
+
+
+def test_poll_fills_marks_expired_net_order(session: Session) -> None:
+    """poll_fills marks a 'submitted' net_order as 'expired' when Alpaca reports it expired."""
+    client = _make_client("alp-expire-001")
+    sleeve = _make_sleeve()
+    mgr = _make_sleeve_manager(session, sleeve)
+    order = _make_order()
+
+    submit_intended_orders([order], client, session, mgr, _AS_OF)
+    net_row = session.query(NetOrderRow).first()
+
+    poll_client = MagicMock()
+    poll_client.get_orders.return_value = [_make_canceled_order_info("alp-expire-001", status="expired")]
+    poll_fills(poll_client, session, mgr)
+
+    session.refresh(net_row)
+    assert net_row.status == "expired"
+
+
+# ---------------------------------------------------------------------------
 # Retry idempotency tests
 # ---------------------------------------------------------------------------
 

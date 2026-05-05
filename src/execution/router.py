@@ -288,7 +288,7 @@ def poll_fills(
 
     # Mark expired / cancelled orders so the drain loop can see they're terminal.
     for order_info in all_closed:
-        if order_info.status not in ("expired", "cancelled"):
+        if order_info.status not in ("expired", "canceled"):
             continue
         net_row = (
             session.query(NetOrderRow)

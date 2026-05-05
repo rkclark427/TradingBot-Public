@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -53,17 +53,7 @@ class AlpacaMarketDataView:
         return self._client.get_bars(symbol, TimeFrame.Day, start, as_of)
 
     def get_latest_price(self, symbol: str) -> Decimal:
-        from alpaca.data.timeframe import TimeFrame
-
-        now = datetime.now(tz=timezone.utc)
-        # Use yesterday as the end so we always ask for fully completed bars.
-        # Asking for "today" outside market hours can return empty on some feeds.
-        end = now - timedelta(days=1)
-        start = now - timedelta(days=10)
-        df = self._client.get_bars(symbol, TimeFrame.Day, start, end)
-        if df.empty:
-            raise ValueError(f"No price data available for {symbol} (feed returned no bars)")
-        return Decimal(str(df["close"].iloc[-1]))
+        return self._client.get_latest_trade_price(symbol)
 
 
 # ---------------------------------------------------------------------------

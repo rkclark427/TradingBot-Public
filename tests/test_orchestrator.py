@@ -7,7 +7,6 @@ from decimal import Decimal
 from unittest.mock import MagicMock
 from uuid import UUID
 
-import pandas as pd
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -70,16 +69,11 @@ def _make_mock_clock(is_open: bool = True) -> MagicMock:
     return clock
 
 
-def _make_mock_client(is_open: bool = True, spy_close: float = 500.0) -> MagicMock:
+def _make_mock_client(is_open: bool = True, spy_price: float = 500.0) -> MagicMock:
     """Return a mock Alpaca client with sensible defaults."""
     client = MagicMock()
     client.get_clock.return_value = _make_mock_clock(is_open)
-
-    # get_bars returns a DataFrame with a "close" column
-    idx = pd.DatetimeIndex([datetime(2026, 5, 3, tzinfo=timezone.utc)])
-    df = pd.DataFrame({"close": [spy_close]}, index=idx)
-    client.get_bars.return_value = df
-
+    client.get_latest_trade_price.return_value = Decimal(str(spy_price))
     client.get_positions.return_value = []
 
     order_info = MagicMock()
@@ -184,7 +178,7 @@ def test_run_once_new_sleeve_submits_buy_order(
         "buy_and_hold", "paper", Decimal("500"), {"symbol": "SPY"}
     )
 
-    mock_client = _make_mock_client(spy_close=500.0)
+    mock_client = _make_mock_client(spy_price=500.0)
     orch = Orchestrator(config, session, mock_client, None, manager)
 
     result = orch.run_once()
@@ -224,7 +218,7 @@ def test_run_once_noop_when_position_at_target(
     )
     session.commit()
 
-    mock_client = _make_mock_client(spy_close=500.0)
+    mock_client = _make_mock_client(spy_price=500.0)
     orch = Orchestrator(config, session, mock_client, None, manager)
 
     result = orch.run_once()
@@ -249,7 +243,7 @@ def test_run_once_empty_universe_blocks_orders(
 
     manager.create_sleeve("buy_and_hold", "paper", Decimal("500"), {"symbol": "SPY"})
 
-    mock_client = _make_mock_client(spy_close=500.0)
+    mock_client = _make_mock_client(spy_price=500.0)
     orch = Orchestrator(config, session, mock_client, None, manager)
 
     result = orch.run_once()

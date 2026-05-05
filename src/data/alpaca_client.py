@@ -31,7 +31,7 @@ from alpaca.trading.enums import (
     TimeInForce,
 )
 from alpaca.data import StockHistoricalDataClient
-from alpaca.data.requests import StockBarsRequest
+from alpaca.data.requests import StockBarsRequest, StockLatestTradeRequest
 from alpaca.data.timeframe import TimeFrame
 
 logger = logging.getLogger(__name__)
@@ -401,6 +401,19 @@ class _BaseClient:
     def cancel_all_orders(self) -> None:
         """Cancel all open orders for this account."""
         _with_retry(lambda: self._trading.cancel_orders())
+
+    # ------------------------------------------------------------------
+    # Latest trade (current market price)
+    # ------------------------------------------------------------------
+
+    def get_latest_trade_price(self, symbol: str) -> Decimal:
+        """Return the price of the most recent trade for *symbol*."""
+        req = StockLatestTradeRequest(symbol_or_symbols=symbol)
+        trades = _with_retry(lambda: self._data.get_stock_latest_trade(req))
+        trade = trades.get(symbol)
+        if trade is None:
+            raise ValueError(f"No latest trade data available for {symbol}")
+        return Decimal(str(trade.price))
 
     # ------------------------------------------------------------------
     # Historical bars

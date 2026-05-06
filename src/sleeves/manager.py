@@ -105,12 +105,14 @@ class SleeveManager:
             return None
         return _row_to_sleeve(row)
 
-    def list_sleeves(self, status_filter: str | None = None) -> list[Sleeve]:
+    def list_sleeves(self, status_filter: str | list[str] | None = None) -> list[Sleeve]:
         rows = SleeveRepo(self._session).list()
         sleeves = [_row_to_sleeve(r) for r in rows]
-        if status_filter is not None:
-            sleeves = [s for s in sleeves if s.status.value == status_filter]
-        return sleeves
+        if status_filter is None:
+            return sleeves
+        if isinstance(status_filter, str):
+            return [s for s in sleeves if s.status.value == status_filter]
+        return [s for s in sleeves if s.status.value in status_filter]
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -119,8 +121,16 @@ class SleeveManager:
     def pause_sleeve(self, sleeve_id: str) -> Sleeve:
         return self._transition(sleeve_id, SleeveStatus.PAUSED, allowed_from={SleeveStatus.RUNNING})
 
+    def halt_sleeve(self, sleeve_id: str) -> Sleeve:
+        """Halt a sleeve via circuit breaker — no new entries, exits continue."""
+        return self._transition(sleeve_id, SleeveStatus.HALTED, allowed_from={SleeveStatus.RUNNING})
+
     def resume_sleeve(self, sleeve_id: str) -> Sleeve:
-        return self._transition(sleeve_id, SleeveStatus.RUNNING, allowed_from={SleeveStatus.PAUSED})
+        """Resume a paused or halted sleeve. Requires manual invocation."""
+        return self._transition(
+            sleeve_id, SleeveStatus.RUNNING,
+            allowed_from={SleeveStatus.PAUSED, SleeveStatus.HALTED},
+        )
 
     def stop_sleeve(self, sleeve_id: str) -> Sleeve:
         return self._transition(

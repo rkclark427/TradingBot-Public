@@ -55,6 +55,7 @@ class SleeveStatus(str, Enum):
 
     RUNNING = "running"
     PAUSED = "paused"
+    HALTED = "halted"
     STOPPING = "stopping"
     STOPPED = "stopped"
 
@@ -143,14 +144,17 @@ class Sleeve:
 
     @property
     def is_active(self) -> bool:
-        """True if the sleeve should be evaluated by the orchestrator."""
-        return self.status == SleeveStatus.RUNNING
+        """True if the sleeve should be evaluated by the orchestrator.
+
+        Includes HALTED so the orchestrator continues processing exits.
+        """
+        return self.status in (SleeveStatus.RUNNING, SleeveStatus.HALTED)
 
     @property
     def can_enter(self) -> bool:
         """True if the sleeve may submit new entry orders.
 
-        RUNNING sleeves can enter. PAUSED sleeves cannot enter but can exit.
+        RUNNING sleeves can enter. PAUSED and HALTED cannot enter but can exit.
         """
         return self.status == SleeveStatus.RUNNING
 
@@ -158,7 +162,7 @@ class Sleeve:
     def can_exit(self) -> bool:
         """True if the sleeve may submit exit orders.
 
-        RUNNING, PAUSED, and STOPPING sleeves can exit. Only STOPPED cannot.
+        RUNNING, PAUSED, HALTED, and STOPPING sleeves can exit. Only STOPPED cannot.
         """
         return self.status != SleeveStatus.STOPPED
 

@@ -25,7 +25,7 @@ from src.portfolio.sizer import targets_to_intended_orders
 from src.queries.kill_switch import get_kill_switch_mode, is_kill_switch_active
 from src.risk.checks import check_and_filter
 from src.sleeves.manager import SleeveManager
-from src.sleeves.types import Mode, Sleeve
+from src.sleeves.types import Mode, Sleeve, SleeveStatus
 from src.strategies.base import MarketDataView, Position, Strategy
 from src.tracking.models import NetOrderRow
 from src.tracking.repos.heartbeat import HeartbeatRepo
@@ -79,8 +79,12 @@ class Orchestrator:
 
         if strategy_registry is None:
             from src.strategies.buy_and_hold import BuyAndHoldSPY
+            from src.strategies.momentum_continuation import MomentumContinuation
 
-            self._strategies: dict[str, Strategy] = {"buy_and_hold": BuyAndHoldSPY()}
+            self._strategies: dict[str, Strategy] = {
+                "buy_and_hold": BuyAndHoldSPY(),
+                "momentum_continuation": MomentumContinuation(),
+            }
         else:
             self._strategies = strategy_registry
 
@@ -201,7 +205,7 @@ class Orchestrator:
 
         total_submitted = 0
         sleeves_processed = 0
-        for sleeve in self._sleeve_manager.list_sleeves(status_filter="running"):
+        for sleeve in self._sleeve_manager.list_sleeves(status_filter=["running", "halted"]):
             try:
                 submitted = self._run_sleeve_cycle(sleeve, now, asset_universe)
                 total_submitted += submitted
@@ -240,6 +244,19 @@ class Orchestrator:
         asset_universe: dict[str, bool],
     ) -> int:
         """Run one cycle for a single sleeve. Returns count of orders submitted."""
+        # Circuit breaker: auto-transition RUNNING sleeve to HALTED if drawdown exceeded.
+        if sleeve.status == SleeveStatus.RUNNING:
+            breaker_pct = float(sleeve.parameters.get("drawdown_circuit_breaker_pct", 0.15))
+            if sleeve.drawdown_pct >= breaker_pct:
+                logger.warning(
+                    "Circuit breaker triggered sleeve=%s drawdown=%.2f%% threshold=%.2f%%",
+                    sleeve.id, sleeve.drawdown_pct * 100, breaker_pct * 100,
+                )
+                self._sleeve_manager.halt_sleeve(str(sleeve.id))
+                refreshed = self._sleeve_manager.get_sleeve(str(sleeve.id))
+                if refreshed is not None:
+                    sleeve = refreshed
+
         strategy = self._strategies.get(sleeve.strategy_name)
         if strategy is None:
             logger.error(
@@ -328,6 +345,14 @@ class Orchestrator:
 
         if not passing:
             return 0
+
+        # HALTED sleeves: only submit exits (sells of currently-held positions).
+        if sleeve.status == SleeveStatus.HALTED:
+            held_symbols = set(positions.keys())
+            passing = [o for o in passing if o.side == "sell" and o.symbol in held_symbols]
+            if not passing:
+                logger.debug("No exit orders for halted sleeve %s", sleeve.id)
+                return 0
 
         alpaca_ids = submit_intended_orders(
             passing, client, self._session, self._sleeve_manager, as_of

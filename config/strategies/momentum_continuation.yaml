@@ -1,0 +1,9 @@
+lookback_days: 20
+hard_stop_pct: 0.04
+trailing_stop_pct: 0.05
+time_stop_days: 10
+risk_per_trade_pct: 0.01
+max_position_pct: 0.25
+max_concurrent_positions: 5
+max_total_deployment_pct: 1.00
+drawdown_circuit_breaker_pct: 0.15

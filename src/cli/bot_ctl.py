@@ -31,6 +31,8 @@ from sqlalchemy.orm import Session
 app = typer.Typer(help="Trading bot control surface.", no_args_is_help=True)
 sleeves_app = typer.Typer(help="Sleeve management commands.", no_args_is_help=True)
 app.add_typer(sleeves_app, name="sleeves")
+backtest_app = typer.Typer(help="Backtest commands.", no_args_is_help=True)
+app.add_typer(backtest_app, name="backtest")
 
 
 # ---------------------------------------------------------------------------
@@ -475,6 +477,237 @@ def db_status() -> None:
     typer.echo(f"Up to date:       {'yes' if up_to_date else 'NO — run bot-ctl (any command) to apply pending migrations'}")
     if not up_to_date:
         raise typer.Exit(1)
+
+
+# ---------------------------------------------------------------------------
+# bot-ctl backtest run / refresh-data / list / cache-status
+# ---------------------------------------------------------------------------
+
+
+@backtest_app.command("run")
+def backtest_run(
+    config_path: Path = typer.Argument(..., help="Path to backtest config YAML"),
+) -> None:
+    """Run a backtest from a config file and generate an HTML report."""
+    import yaml
+
+    from src.backtest.config import BacktestConfig, UNIVERSE_MAP, instantiate_strategy
+    from src.backtest.data import BacktestDataLayer
+    from src.backtest.engine import run_simulation
+    from src.backtest.reporting import generate_report
+
+    if not config_path.exists():
+        typer.echo(f"Config file not found: {config_path}", err=True)
+        raise typer.Exit(1)
+
+    with open(config_path, encoding="utf-8") as f:
+        raw = yaml.safe_load(f)
+
+    try:
+        cfg = BacktestConfig.model_validate(raw)
+    except Exception as exc:
+        typer.echo(f"Invalid config: {exc}", err=True)
+        raise typer.Exit(1)
+
+    data_layer = BacktestDataLayer(cfg.cache_db)
+    sim = cfg.simulation
+
+    # Resolve null end_date to latest cached date
+    end_date = sim.end_date
+    if end_date is None:
+        end_date = data_layer.get_latest_trade_date()
+        if end_date is None:
+            typer.echo(
+                "Cache is empty — run `bot-ctl backtest refresh-data --all` first.", err=True
+            )
+            raise typer.Exit(1)
+        typer.echo(f"end_date resolved to latest cached date: {end_date}")
+
+    # Strategy
+    try:
+        strategy = instantiate_strategy(cfg.strategy.class_name)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1)
+
+    universe = UNIVERSE_MAP.get(cfg.strategy.class_name, ["SPY"])
+    typer.echo(
+        f"Running {cfg.strategy.class_name}  {sim.start_date} → {end_date}"
+        f"  capital=${float(sim.starting_capital):,.0f}"
+        f"  slippage={sim.slippage_bps}bps"
+    )
+
+    result = run_simulation(
+        strategy=strategy,
+        params=cfg.strategy.parameters,
+        universe=universe,
+        data_layer=data_layer,
+        start_date=sim.start_date,
+        end_date=end_date,
+        starting_capital=sim.starting_capital,
+        slippage_bps=sim.slippage_bps,
+        cash_annualized_rate=sim.cash_annualized_rate,
+    )
+    final_nav = float(result.snapshots[-1].nav) if result.snapshots else 0.0
+    typer.echo(
+        f"  → {len(result.snapshots)} days  {len(result.trades)} trades  "
+        f"final NAV=${final_nav:,.2f}"
+    )
+
+    # Benchmarks
+    benchmark_results = []
+    for bench_name in cfg.benchmarks:
+        typer.echo(f"Running benchmark: {bench_name}")
+        try:
+            bench_strategy = instantiate_strategy(bench_name)
+        except ValueError as exc:
+            typer.echo(f"  Warning: skipping {bench_name}: {exc}", err=True)
+            continue
+        bench_universe = UNIVERSE_MAP.get(bench_name, ["SPY"])
+        bench_result = run_simulation(
+            strategy=bench_strategy,
+            params={},
+            universe=bench_universe,
+            data_layer=data_layer,
+            start_date=sim.start_date,
+            end_date=end_date,
+            starting_capital=sim.starting_capital,
+            slippage_bps=sim.slippage_bps,
+            cash_annualized_rate=sim.cash_annualized_rate,
+        )
+        bench_nav = float(bench_result.snapshots[-1].nav) if bench_result.snapshots else 0.0
+        typer.echo(f"  → final NAV=${bench_nav:,.2f}")
+        benchmark_results.append(bench_result)
+
+    # Report
+    output_dir = cfg.output.directory
+    typer.echo(f"Generating report → {output_dir}")
+    report_path = generate_report(
+        strategy_result=result,
+        benchmark_results=benchmark_results,
+        output_dir=output_dir,
+        config=raw,
+    )
+    typer.echo(f"Done. Report: {report_path}")
+
+
+@backtest_app.command("refresh-data")
+def backtest_refresh_data(
+    symbol: list[str] = typer.Option([], "--symbol", "-s", help="Symbol(s) to refresh (repeatable)"),
+    all_: bool = typer.Option(False, "--all", help="Refresh the full 16-ETF default universe"),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing cache rows"),
+    cache_db: Path = typer.Option(Path("data/backtest_cache.db"), "--cache-db"),
+) -> None:
+    """Fetch historical price data from yfinance into the local cache."""
+    from datetime import date as _date
+
+    from src.backtest.data import BacktestDataLayer
+
+    if not all_ and not symbol:
+        typer.echo("Specify at least one --symbol SYMBOL or use --all.", err=True)
+        raise typer.Exit(1)
+
+    if all_:
+        symbols = sorted([
+            "XLE", "XLK", "XLF", "XLV", "XLI", "XLY", "XLP", "XLU", "XLB", "XLRE", "XLC",
+            "SPY", "QQQ", "IWM", "EFA", "EEM",
+        ])
+    else:
+        symbols = list(symbol)
+
+    typer.echo(f"Refreshing {len(symbols)} symbol(s) into {cache_db} …")
+    layer = BacktestDataLayer(cache_db)
+    results = layer.refresh_all(symbols, start_date=_date(2010, 1, 1), force=force)
+
+    ok = sum(1 for n in results.values() if n > 0)
+    total = sum(results.values())
+    for sym, n in sorted(results.items()):
+        status = f"{n:>6} rows" if n > 0 else "  (no new rows)"
+        typer.echo(f"  {sym:<6} {status}")
+
+    typer.echo(f"Done. {ok}/{len(symbols)} symbols updated, {total} total rows written.")
+
+
+@backtest_app.command("list")
+def backtest_list(
+    directory: Path = typer.Option(
+        Path("backtests"), "--dir", help="Directory to scan for backtest runs"
+    ),
+) -> None:
+    """List backtest runs found in the output directory."""
+    import json
+
+    if not directory.exists():
+        typer.echo(f"No backtests directory at {directory}. Run a backtest first.")
+        return
+
+    runs: list[tuple[Path, dict]] = []
+    for meta_path in sorted(directory.glob("*/metadata.json"), reverse=True):
+        try:
+            runs.append((meta_path.parent, json.loads(meta_path.read_text(encoding="utf-8"))))
+        except Exception:
+            pass
+
+    if not runs:
+        typer.echo(f"No backtest runs found in {directory}.")
+        return
+
+    typer.echo(f"{'Run directory':<36} {'Strategy':<24} {'Period':<24} {'Run timestamp'}")
+    typer.echo("-" * 110)
+    for run_dir, meta in runs:
+        period = f"{meta.get('start_date', '?')} → {meta.get('end_date', '?')}"
+        ts = (meta.get("run_timestamp") or "?")[:19].replace("T", " ")
+        name = meta.get("strategy_name", "?")
+        typer.echo(f"{str(run_dir.name):<36} {name:<24} {period:<24} {ts}")
+
+
+@backtest_app.command("cache-status")
+def backtest_cache_status(
+    cache_db: Path = typer.Option(Path("data/backtest_cache.db"), "--cache-db"),
+) -> None:
+    """Show freshness of cached price data for each symbol."""
+    from sqlalchemy import func, select
+    from sqlalchemy.orm import Session
+
+    from src.backtest.cache_models import PriceBarRow
+    from src.backtest.data import BacktestDataLayer
+
+    if not cache_db.exists():
+        typer.echo(f"Cache not found at {cache_db}.")
+        typer.echo("Run `bot-ctl backtest refresh-data --all` to populate it.")
+        return
+
+    layer = BacktestDataLayer(cache_db)
+    cache_v = layer.get_cache_version()
+    latest_date = layer.get_latest_trade_date()
+
+    typer.echo(f"Cache:         {cache_db}")
+    typer.echo(f"Last fetched:  {cache_v.strftime('%Y-%m-%d %H:%M UTC') if cache_v else '(empty)'}")
+    typer.echo(f"Latest date:   {latest_date or '—'}")
+    typer.echo()
+
+    with Session(layer._engine) as session:
+        rows = session.execute(
+            select(
+                PriceBarRow.symbol,
+                func.count().label("n_rows"),
+                func.min(PriceBarRow.trade_date).label("first_date"),
+                func.max(PriceBarRow.trade_date).label("last_date"),
+            )
+            .group_by(PriceBarRow.symbol)
+            .order_by(PriceBarRow.symbol)
+        ).all()
+
+    if not rows:
+        typer.echo("Cache is empty.")
+        return
+
+    typer.echo(f"{'Symbol':<8} {'Rows':>6}  {'First date':<12}  {'Last date'}")
+    typer.echo("-" * 44)
+    for row in rows:
+        typer.echo(
+            f"{row.symbol:<8} {row.n_rows:>6}  {str(row.first_date):<12}  {row.last_date}"
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -245,6 +245,14 @@ class BacktestDataLayer:
             ).scalar()
         return result
 
+    def get_latest_trade_date(self) -> date | None:
+        """Return the most recent trade_date across all cached symbols, or None if empty."""
+        with Session(self._engine) as session:
+            result = session.execute(
+                select(func.max(PriceBarRow.trade_date))
+            ).scalar()
+        return result
+
 
 # ---------------------------------------------------------------------------
 # No-lookahead market data view (for simulation engine)

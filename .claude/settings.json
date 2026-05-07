@@ -36,7 +36,12 @@
       "Bash(python -m pytest --no-header --tb=short -q)",
       "Read(//c/Users/rober/.claude/projects/c--Users-rober-OneDrive-Documents-GitHub-TradingBot/memory/**)",
       "PowerShell(Get-Process -Id 79072 -ErrorAction SilentlyContinue)",
-      "Bash(Remove-Item .git/gc.pid)"
+      "Bash(Remove-Item .git/gc.pid)",
+      "PowerShell(git -C \"c:\\\\Users\\\\rober\\\\OneDrive\\\\Documents\\\\GitHub\\\\TradingBot\" status 2>&1)",
+      "PowerShell(git -C \"c:\\\\Users\\\\rober\\\\OneDrive\\\\Documents\\\\GitHub\\\\TradingBot\" log --oneline -3 2>&1)",
+      "PowerShell(git -C \"c:\\\\Users\\\\rober\\\\OneDrive\\\\Documents\\\\GitHub\\\\TradingBot\" fsck 2>&1)",
+      "PowerShell(head -20)",
+      "PowerShell(git -C \"c:\\\\Users\\\\rober\\\\OneDrive\\\\Documents\\\\GitHub\\\\TradingBot\" remote -v 2>&1)"
     ],
     "additionalDirectories": [
       "c:\\Users\\rober\\.claude\\projects\\c--Users-rober-OneDrive-Documents-GitHub-TradingBot\\memory",

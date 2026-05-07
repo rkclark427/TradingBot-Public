@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import uuid4
@@ -22,6 +22,7 @@ from src.strategies.buy_and_hold import BuyAndHoldSPY
 from src.tracking.repos.events import CapitalEventRepo
 from src.tracking.repos.positions import PositionRepo
 from src.tracking.repos.sleeves import SleeveRepo
+from src.tracking.repos.strategy_state import StrategyStateRepo
 from src.tracking.models import SleeveRow
 
 _DEFAULT_REGISTRY: dict[str, Strategy] = {
@@ -200,6 +201,8 @@ class SleeveManager:
         current_cash = Decimal(str(row.current_cash))
         current_nav = Decimal(str(row.current_nav))
 
+        state_repo = StrategyStateRepo(self._session)
+
         if side == "buy":
             new_qty = (existing.qty if existing else Decimal("0")) + qty
             if existing:
@@ -211,12 +214,27 @@ class SleeveManager:
             new_cash = current_cash - qty * fill_price - fees
             # Position acquired at cost: no NAV change except fees
             new_nav = current_nav - fees
+
+            # Create strategy_state on first buy of this symbol (don't overwrite on additions).
+            if not existing and state_repo.get(sleeve_id, symbol) is None:
+                today: date = datetime.now(tz=timezone.utc).date()
+                state_repo.upsert(
+                    sleeve_id=sleeve_id,
+                    symbol=symbol,
+                    entry_date=today,
+                    entry_price=fill_price,
+                    days_held=0,
+                    highest_close_since_entry=fill_price,
+                    last_session_date=today,
+                )
         else:
             current_qty = existing.qty if existing else Decimal("0")
             avg_cost = existing.avg_cost if existing else fill_price
             new_qty = current_qty - qty
             if new_qty <= 0:
                 position_repo.upsert(sleeve_id=sleeve_id, symbol=symbol, qty=Decimal("0"), avg_cost=avg_cost)
+                # Position fully closed: remove strategy_state entry.
+                state_repo.delete(sleeve_id, symbol)
             else:
                 position_repo.upsert(sleeve_id=sleeve_id, symbol=symbol, qty=new_qty, avg_cost=avg_cost)
             realized_pnl = (fill_price - avg_cost) * qty

@@ -181,6 +181,25 @@ class PositionRow(Base):
 
 
 # ---------------------------------------------------------------------------
+# Strategy state (live position tracking for stop-loss / time-stop logic)
+# ---------------------------------------------------------------------------
+
+
+class StrategyStateRow(Base):
+    __tablename__ = "strategy_state"
+
+    sleeve_id: Mapped[str] = mapped_column(
+        String, ForeignKey("sleeves.id"), primary_key=True
+    )
+    symbol: Mapped[str] = mapped_column(String, primary_key=True)
+    entry_date: Mapped[date] = mapped_column(Date, nullable=False)
+    entry_price: Mapped[Decimal] = mapped_column(Numeric(20, 10), nullable=False)
+    days_held: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    highest_close_since_entry: Mapped[Decimal] = mapped_column(Numeric(20, 10), nullable=False)
+    last_session_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+
+# ---------------------------------------------------------------------------
 # Snapshots
 # ---------------------------------------------------------------------------
 

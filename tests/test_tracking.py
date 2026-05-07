@@ -36,6 +36,7 @@ EXPECTED_TABLES = {
     "fills",
     "sleeve_fills",
     "positions",
+    "strategy_state",
     "sleeve_nav_snapshots",
     "account_snapshots",
     "risk_events",

@@ -31,6 +31,7 @@ from src.tracking.models import NetOrderRow
 from src.tracking.repos.heartbeat import HeartbeatRepo
 from src.tracking.repos.market import AssetUniverseRepo
 from src.tracking.repos.positions import PositionRepo
+from src.tracking.repos.strategy_state import StrategyStateRepo
 
 logger = logging.getLogger(__name__)
 
@@ -277,6 +278,48 @@ class Orchestrator:
             for r in pos_rows
         }
 
+        # Load per-symbol strategy state and refresh days_held / highest_close.
+        # Prices fetched here for held positions are re-used for order sizing below.
+        today = as_of.date()
+        prefetched_prices: dict[str, Decimal] = {}
+        state_repo = StrategyStateRepo(self._session)
+        position_state: dict[str, dict[str, Any]] = {}
+        for row in state_repo.get_by_sleeve(str(sleeve.id)):
+            if row.symbol not in positions:
+                # Position closed without strategy_state being cleaned up.
+                state_repo.delete(str(sleeve.id), row.symbol)
+                continue
+            new_days_held = row.days_held
+            new_last_session = row.last_session_date
+            if row.last_session_date is None or row.last_session_date < today:
+                new_days_held += 1
+                new_last_session = today
+            new_highest = Decimal(str(row.highest_close_since_entry))
+            try:
+                current_px = market_data.get_latest_price(row.symbol)
+                prefetched_prices[row.symbol] = current_px
+                if current_px > new_highest:
+                    new_highest = current_px
+            except Exception:
+                logger.warning(
+                    "Could not get price for %s; using stored highest_close", row.symbol
+                )
+            state_repo.upsert(
+                sleeve_id=str(sleeve.id),
+                symbol=row.symbol,
+                entry_date=row.entry_date,
+                entry_price=Decimal(str(row.entry_price)),
+                days_held=new_days_held,
+                highest_close_since_entry=new_highest,
+                last_session_date=new_last_session,
+            )
+            position_state[row.symbol] = {
+                "entry_date": row.entry_date,
+                "entry_price": float(row.entry_price),
+                "days_held": new_days_held,
+                "highest_close_since_entry": float(new_highest),
+            }
+
         targets = strategy.generate_targets(
             params=sleeve.parameters,
             nav=float(sleeve.current_nav),
@@ -285,6 +328,7 @@ class Orchestrator:
             market_data=market_data,
             universe=list(asset_universe.keys()) or ["SPY"],
             as_of=as_of,
+            position_state=position_state if position_state else None,
         )
 
         if not targets:
@@ -292,8 +336,8 @@ class Orchestrator:
             return 0
 
         symbols_needed = {t.symbol for t in targets} | set(positions.keys())
-        current_prices: dict[str, Decimal] = {}
-        for symbol in symbols_needed:
+        current_prices: dict[str, Decimal] = dict(prefetched_prices)
+        for symbol in symbols_needed - set(prefetched_prices):
             try:
                 current_prices[symbol] = market_data.get_latest_price(symbol)
             except Exception:

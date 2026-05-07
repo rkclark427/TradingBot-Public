@@ -8,6 +8,54 @@ Each entry: date, decision, rationale, status (active / superseded by date).
 
 ---
 
+## 2026-05-07 — strategy_state last_session_date gate for once-per-day days_held increment
+
+**Decision:** The `strategy_state` table has a `last_session_date` column. The orchestrator increments `days_held` only when `last_session_date < today`, then sets `last_session_date = today`. Multiple cycles within the same trading day don't double-count.
+**Rationale:** The orchestrator runs every N seconds (many times per trading day). Without a gate, `days_held` would accumulate far faster than the backtest engine's once-per-day logic, causing time stops to fire incorrectly. `last_session_date` is the cheapest gate — no additional DB queries, no in-memory state.
+**Status:** Active.
+
+---
+
+## 2026-05-07 — Pre-fetch held-position prices in orchestrator to avoid duplicate API calls
+
+**Decision:** `_run_sleeve_cycle` fetches current prices for held positions (needed to update `highest_close_since_entry`) before calling `generate_targets`, then re-uses those prices for order sizing rather than fetching them again.
+**Rationale:** `market_data.get_latest_price` is a live Alpaca REST call. For a sleeve with 5 held positions, fetching twice per cycle would double the API surface for no gain. Pre-fetching once and passing it through avoids the redundancy.
+**Status:** Active.
+
+---
+
+## 2026-05-07 — strategy_state entry_price frozen at first buy; not updated on position additions
+
+**Decision:** When `attribute_fill` processes a buy and a `strategy_state` entry already exists for that symbol, it leaves the existing entry unchanged. Only the first buy creates the entry.
+**Rationale:** MomentumContinuation never adds to a position (it opens a full position at once). If it ever did, the original entry_price is the economically correct one for hard-stop calculation. Updating on additions would reset the stop-loss reference point and could allow a losing trade to avoid its stop.
+**Status:** Active.
+
+---
+
+## 2026-05-07 — Separate SQLite for backtest cache; create_all not Alembic
+
+**Decision:** Backtest price data lives in its own SQLite file (`data/backtest_cache.db`), initialized with `Base.metadata.create_all()` rather than Alembic migrations.
+**Rationale:** The backtest cache is entirely derived data — it can be deleted and rebuilt from yfinance at any time. Alembic migrations are for state that would be lost if the DB were deleted (live trades, fills, NAV history). Using `create_all` for the cache avoids polluting the migration history with schema changes to ephemeral data.
+**Status:** Active.
+
+---
+
+## 2026-05-07 — MomentumContinuation universe fixed in code, not config
+
+**Decision:** The 16-symbol universe (11 sector ETFs + SPY, QQQ, IWM, EFA, EEM) is a constant `UNIVERSE` in `momentum_continuation.py`. Changing it requires a code edit, not a YAML change.
+**Rationale:** The universe is load-bearing for strategy behavior — a wrong universe changes the signal characteristics entirely, not just a parameter. Making it config-editable without corresponding test coverage would create silent misuse risk. When the strategy warrants a different universe, that deserves a deliberate code change and review.
+**Status:** Active.
+
+---
+
+## 2026-05-07 — yfinance confirmed as backtest data source; Alpaca not used for historical data
+
+**Decision:** Historical price data for backtests comes from yfinance (`yfinance` 1.x). Alpaca is not used for backtest data.
+**Rationale:** Alpaca's historical data API has tighter rate limits and costs more at scale. yfinance provides free adjusted OHLCV going back to the 1990s for the ETF universe we use, with `auto_adjust=True` giving correct split+dividend-adjusted prices. The tradeoff is that yfinance has no SLA and can break on API changes, but the local SQLite cache insulates backtests from that once populated.
+**Status:** Active.
+
+---
+
 ## 2026-05 — VM size constraint pending investigation
 
 **Decision:** Use whatever Azure VM size is available; B2s preferred but D2 acceptable if subscription forces it.

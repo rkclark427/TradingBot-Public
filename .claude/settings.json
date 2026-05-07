@@ -41,7 +41,8 @@
       "PowerShell(git -C \"c:\\\\Users\\\\rober\\\\OneDrive\\\\Documents\\\\GitHub\\\\TradingBot\" log --oneline -3 2>&1)",
       "PowerShell(git -C \"c:\\\\Users\\\\rober\\\\OneDrive\\\\Documents\\\\GitHub\\\\TradingBot\" fsck 2>&1)",
       "PowerShell(head -20)",
-      "PowerShell(git -C \"c:\\\\Users\\\\rober\\\\OneDrive\\\\Documents\\\\GitHub\\\\TradingBot\" remote -v 2>&1)"
+      "PowerShell(git -C \"c:\\\\Users\\\\rober\\\\OneDrive\\\\Documents\\\\GitHub\\\\TradingBot\" remote -v 2>&1)",
+      "Bash(git fetch *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\rober\\.claude\\projects\\c--Users-rober-OneDrive-Documents-GitHub-TradingBot\\memory",

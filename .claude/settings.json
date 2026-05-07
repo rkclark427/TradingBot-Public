@@ -34,10 +34,13 @@
       "Bash(python -m pytest tests/test_strategy_state.py::TestAttributeFillStrategyState::test_buy_fill_creates_strategy_state -v --no-header --tb=short)",
       "Bash(python -m pytest tests/test_strategy_state.py -v --no-header --tb=short)",
       "Bash(python -m pytest --no-header --tb=short -q)",
-      "Read(//c/Users/rober/.claude/projects/c--Users-rober-OneDrive-Documents-GitHub-TradingBot/memory/**)"
+      "Read(//c/Users/rober/.claude/projects/c--Users-rober-OneDrive-Documents-GitHub-TradingBot/memory/**)",
+      "PowerShell(Get-Process -Id 79072 -ErrorAction SilentlyContinue)",
+      "Bash(Remove-Item .git/gc.pid)"
     ],
     "additionalDirectories": [
-      "c:\\Users\\rober\\.claude\\projects\\c--Users-rober-OneDrive-Documents-GitHub-TradingBot\\memory"
+      "c:\\Users\\rober\\.claude\\projects\\c--Users-rober-OneDrive-Documents-GitHub-TradingBot\\memory",
+      "c:\\Users\\rober\\OneDrive\\Documents\\GitHub\\TradingBot\\.git"
     ]
   }
 }

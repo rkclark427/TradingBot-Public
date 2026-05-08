@@ -69,11 +69,11 @@ The phase is **not** complete without the baseline backtest having been run and 
 
 ## Phase gate checklist (to complete before Phase 3)
 
-- [ ] Run `bot-ctl backtest refresh-data --all` on the VM; verify all 16 symbols cached
-- [ ] Run `bot-ctl backtest run backtest_configs/momentum_2018_baseline.yaml`
-- [ ] Review `report.html`: equity curve shape, max drawdown, Sharpe, win rate
-- [ ] Confirm report is reproducible (second run produces identical statistics.csv)
-- [ ] Record baseline metrics in decisions.md before any tuning
+- [x] Run `bot-ctl backtest refresh-data --all` on the VM; verify all 16 symbols cached — 16/16, 62196 rows (2026-05-08)
+- [x] Run `bot-ctl backtest run backtest_configs/momentum_2018_baseline.yaml` — 2098 days, 539 trades, NAV $16,966.88 vs SPY $30,893.10 (2026-05-08)
+- [x] Review `report.html`: equity curve shape, max drawdown, Sharpe, win rate — Sharpe 0.25, max DD -13.3%, win rate 57.7% (2026-05-08)
+- [x] Confirm report is reproducible (second run produces identical statistics.csv) — confirmed identical (2026-05-08)
+- [x] Record baseline metrics in decisions.md before any tuning — recorded (2026-05-08)
 
 ## Spec documents
 

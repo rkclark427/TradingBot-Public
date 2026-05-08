@@ -8,6 +8,35 @@ Each entry: date, decision, rationale, status (active / superseded by date).
 
 ---
 
+## 2026-05-08 — MomentumContinuation baseline backtest results (Phase 2 gate)
+
+**Decision:** Record baseline metrics before any parameter tuning. Do not adjust parameters until these are documented.
+
+**Results (2018-01-01 → 2026-05-07, $10,000 starting capital, 5 bps slippage):**
+
+| Metric | MomentumContinuation | BuyAndHoldSPY |
+|---|---|---|
+| Total return | 69.6% | 208.9% |
+| Annualized return | 6.55% | 14.51% |
+| Annualized volatility | 10.4% | 19.3% |
+| Sharpe | 0.25 | 0.55 |
+| Sortino | 0.22 | 0.51 |
+| Max drawdown | -13.3% | -33.7% |
+| Calmar | 0.49 | 0.43 |
+| Win rate | 57.7% | — |
+| Profit factor | 1.27 | — |
+| Avg winner / loser | +2.59% / -2.73% | — |
+| Trades | 539 | — |
+| Avg hold | 14.9 days | — |
+| Time underwater | 94.2% | 85.5% |
+| Longest losing streak | 10 | — |
+
+**Observations:** Strategy significantly underperforms SPY on absolute and risk-adjusted returns. Lower volatility and drawdown than benchmark is expected (strategy is often in cash). The 94.2% time-underwater figure and thin avg-winner-vs-loser spread (2.59% vs 2.73%) suggest the entry/exit parameters deserve tuning. The Calmar (0.49 vs 0.43) is the one metric where the strategy slightly edges out SPY, reflecting the smaller drawdown.
+
+**Status:** Active. Baseline for Phase 2 gate. Tuning may begin in Phase 3.
+
+---
+
 ## 2026-05-07 — strategy_state last_session_date gate for once-per-day days_held increment
 
 **Decision:** The `strategy_state` table has a `last_session_date` column. The orchestrator increments `days_held` only when `last_session_date < today`, then sets `last_session_date = today`. Multiple cycles within the same trading day don't double-count.

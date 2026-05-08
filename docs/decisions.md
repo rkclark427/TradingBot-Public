@@ -8,6 +8,38 @@ Each entry: date, decision, rationale, status (active / superseded by date).
 
 ---
 
+## 2026-05-08 — Trailing stop widened to 8% for first tuning run
+
+**Decision:** Increase `trailing_stop_pct` from 5% to 8% in `backtest_configs/momentum_2018_trailing8.yaml`. Baseline config left unchanged.
+**Rationale:** Exit reason analysis showed trailing stop fired only 18 times (3.3% of 539 trades). Winners are being capped by the 10-day time stop before trailing stop has a chance to engage. Widening from 5% to 8% should let more winners ride past the initial consolidation without getting shaken out, at the cost of giving back more on eventual reversal. Hard stops (-4.96% avg, 0% win rate) are the primary loss source; trailing stop is not the problem, it's just not contributing.
+**Status:** Active. Supersedes baseline if results improve.
+
+---
+
+## 2026-05-08 — Baseline exit reason analysis: trailing stop nearly absent
+
+**Decision:** Document the mechanical findings from baseline trade log before tuning.
+
+**Exit reason breakdown (539 trades):**
+
+| Exit reason | Count | % | Win% | Avg P&L | Avg W | Avg L | Avg hold |
+|---|---|---|---|---|---|---|---|
+| time_stop | 440 | 81.6% | 69.1% | +1.34% | +2.60% | -1.49% | 16.0 days |
+| hard_stop | 77 | 14.3% | 0% | -4.96% | — | -4.96% | 9.4 days |
+| trailing_stop | 18 | 3.3% | 22.2% | -1.95% | +0.91% | -2.77% | 12.0 days |
+| end_of_sim | 4 | 0.7% | 75% | +2.26% | — | — | 11.5 days |
+
+**Key findings:**
+- Trailing stop barely firing (3.3%) — winners don't get enough continuation to trigger it; time stop harvests gains first
+- Hard stops are the primary loss driver: 77 × -4.96% avg on a ~25% NAV position ≈ -1.25% NAV per hit
+- Payoff asymmetry is inverted: time stop avg gain (+1.34%) is capped; hard stop avg loss (-4.96%) is not
+- Entry signal quality is reasonable: 69.1% win rate on time-stop exits suggests breakouts are finding real setups
+- No mechanical bugs detected: 16-day avg hold for time_stop = 10 trading days + weekends, as expected
+
+**Status:** Active. Baseline reference for tuning comparisons.
+
+---
+
 ## 2026-05-08 — MomentumContinuation baseline backtest results (Phase 2 gate)
 
 **Decision:** Record baseline metrics before any parameter tuning. Do not adjust parameters until these are documented.

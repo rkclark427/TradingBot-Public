@@ -1,0 +1,40 @@
+# MomentumContinuation — trailing_stop_pct widened from 5% to 8%.
+#
+# Motivation: baseline exit analysis showed trailing stop fired only 18 times
+# (3.3% of 539 trades). Winners were capped by the 10-day time stop before the
+# trailing stop engaged. Wider stop gives continuation room without changing the
+# entry signal or hard stop.
+#
+# All other parameters identical to momentum_2018_baseline.yaml.
+#
+# Usage:
+#   bot-ctl backtest run backtest_configs/momentum_2018_trailing8.yaml
+
+strategy:
+  class: MomentumContinuation
+  parameters:
+    lookback_days: 20
+    hard_stop_pct: 0.04
+    trailing_stop_pct: 0.08
+    time_stop_days: 10
+    risk_per_trade_pct: 0.01
+    max_position_pct: 0.25
+    max_concurrent_positions: 5
+    max_total_deployment_pct: 1.00
+    drawdown_circuit_breaker_pct: 0.15
+
+benchmarks:
+  - BuyAndHoldSPY
+
+simulation:
+  start_date: 2018-01-01
+  end_date: null
+  starting_capital: 10000
+  cash_annualized_rate: 0.04
+  slippage_bps: 5
+
+output:
+  directory: ./backtests/momentum_2018_trailing8/
+  format: html
+
+cache_db: data/backtest_cache.db

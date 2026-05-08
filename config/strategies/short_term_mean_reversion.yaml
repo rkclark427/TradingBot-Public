@@ -1,0 +1,10 @@
+lookback_days: 210
+entry_rsi_threshold: 10
+exit_rsi_threshold: 70
+hard_stop_pct: 0.08
+time_stop_days: 15
+risk_per_trade_pct: 0.01
+max_position_pct: 0.20
+max_concurrent_positions: 8
+max_total_deployment_pct: 1.00
+drawdown_circuit_breaker_pct: 0.15

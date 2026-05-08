@@ -80,6 +80,10 @@ _STRATEGY_REGISTRY: dict[str, tuple[str, str]] = {
         "src.strategies.buy_and_hold",
         "BuyAndHoldSPY",
     ),
+    "ShortTermMeanReversion": (
+        "src.strategies.short_term_mean_reversion",
+        "ShortTermMeanReversion",
+    ),
 }
 
 # Maps strategy class name → list of tradeable symbols.
@@ -90,6 +94,20 @@ UNIVERSE_MAP: dict[str, list[str]] = {
         "SPY", "QQQ", "IWM", "EFA", "EEM",
     ]),
     "BuyAndHoldSPY": ["SPY"],
+    "ShortTermMeanReversion": sorted([
+        "AAPL", "MSFT", "GOOGL", "GOOG", "META", "NVDA", "AVGO", "TXN", "QCOM", "IBM",
+        "ORCL", "ACN", "CSCO", "INTC", "AMD",
+        "AMZN", "TSLA", "HD", "MCD", "NKE", "SBUX", "TGT", "LOW", "BKNG", "F",
+        "WMT", "PG", "KO", "PEP", "COST", "CL", "MO", "PM", "EL",
+        "JNJ", "UNH", "PFE", "MRK", "ABBV", "TMO", "ABT", "MDT", "BMY", "AMGN",
+        "GILD", "CVS",
+        "BRK-B", "JPM", "BAC", "WFC", "GS", "MS", "BLK", "AXP", "USB", "C",
+        "MMC", "CB",
+        "HON", "UPS", "BA", "CAT", "DE", "MMM", "GE", "LMT", "RTX", "FDX",
+        "XOM", "CVX", "COP", "SLB", "EOG",
+        "LIN", "APD", "NEE", "DUK", "SO", "AMT", "PLD",
+        "VZ", "T", "DIS", "CMCSA", "NFLX",
+    ]),
 }
 
 

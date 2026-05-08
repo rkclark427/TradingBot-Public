@@ -608,10 +608,11 @@ def backtest_refresh_data(
         raise typer.Exit(1)
 
     if all_:
-        symbols = sorted([
-            "XLE", "XLK", "XLF", "XLV", "XLI", "XLY", "XLP", "XLU", "XLB", "XLRE", "XLC",
-            "SPY", "QQQ", "IWM", "EFA", "EEM",
-        ])
+        from src.backtest.config import UNIVERSE_MAP
+        all_syms: set[str] = set()
+        for syms in UNIVERSE_MAP.values():
+            all_syms.update(syms)
+        symbols = sorted(all_syms)
     else:
         symbols = list(symbol)
 

@@ -5,6 +5,7 @@ import math
 from datetime import datetime
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from src.strategies.base import (
@@ -63,6 +64,18 @@ def _compute_rsi(closes: pd.Series, period: int = 2) -> pd.Series:
     return 100.0 - (100.0 / (1.0 + rs))
 
 
+def _compute_realized_vol(closes: pd.Series, lookback: int) -> float:
+    """Annualized realized volatility over the trailing `lookback` log-return bars.
+
+    Returns NaN if fewer than `lookback` returns are available.
+    """
+    log_returns = np.log(closes / closes.shift(1)).dropna()
+    tail = log_returns.tail(lookback)
+    if len(tail) < lookback:
+        return math.nan
+    return float(tail.std() * np.sqrt(252))
+
+
 class ShortTermMeanReversion(Strategy):
     """Mean reversion on S&P 100 large-caps using RSI(2) as entry/exit signal.
 
@@ -113,6 +126,8 @@ class ShortTermMeanReversion(Strategy):
         max_position_pct: float = float(params.get("max_position_pct", 0.20))
         max_concurrent_positions: int = int(params.get("max_concurrent_positions", 8))
         max_total_deployment_pct: float = float(params.get("max_total_deployment_pct", 1.00))
+        vol_filter_lookback: int = int(params.get("vol_filter_lookback", 10))
+        vol_filter_multiplier: float = float(params.get("vol_filter_multiplier", 2.0))
 
         ps = position_state or {}
         tradeable = set(universe)
@@ -186,6 +201,28 @@ class ShortTermMeanReversion(Strategy):
             kept_symbols.add(symbol)
 
         # -----------------------------------------------------------------
+        # 1b. Pre-scan full universe for realized volatility (entry filter).
+        # -----------------------------------------------------------------
+        universe_vols: dict[str, float] = {}
+        _vol_bars_needed = vol_filter_lookback + 1
+        for _sym in UNIVERSE:
+            try:
+                _vb = market_data.get_bars(_sym, _vol_bars_needed, as_of)
+                if _vb is not None and len(_vb) >= _vol_bars_needed:
+                    _rv = _compute_realized_vol(_vb["close"], vol_filter_lookback)
+                    if not math.isnan(_rv):
+                        universe_vols[_sym] = _rv
+            except Exception:
+                pass
+        _vol_values = list(universe_vols.values())
+        universe_median_vol: float = float(np.median(_vol_values)) if _vol_values else math.nan
+        vol_threshold: float = (
+            universe_median_vol * vol_filter_multiplier
+            if not math.isnan(universe_median_vol)
+            else math.nan
+        )
+
+        # -----------------------------------------------------------------
         # 2. Entry signals — scan universe for RSI(2) oversold + uptrend
         # -----------------------------------------------------------------
         open_count = len(kept_symbols)
@@ -225,6 +262,12 @@ class ShortTermMeanReversion(Strategy):
             current_rsi = float(rsi_series.iloc[-1])
             if math.isnan(current_rsi) or current_rsi >= entry_rsi_threshold:
                 continue
+
+            # Volatility filter: skip candidates whose realized vol exceeds the threshold.
+            if not math.isnan(vol_threshold):
+                sym_vol = universe_vols.get(symbol, math.nan)
+                if not math.isnan(sym_vol) and sym_vol > vol_threshold:
+                    continue
 
             candidates.append((current_rsi, symbol))
 

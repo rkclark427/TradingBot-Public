@@ -19,6 +19,8 @@ strategy:
     max_concurrent_positions: 8
     max_total_deployment_pct: 1.00
     drawdown_circuit_breaker_pct: 0.15
+    vol_filter_lookback: 10
+    vol_filter_multiplier: 2.0
 
 benchmarks:
   - BuyAndHoldSPY

@@ -241,10 +241,10 @@ def run_simulation(
     # Pre-fetch price data for the full simulation window.
     # Extra calendar-day buffer ensures the strategy has lookback history on day 1.
     from datetime import timedelta
-    data_start = start_date - timedelta(days=180)  # ~6 months of extra lookback
+    data_start = start_date - timedelta(days=500)  # ~350 trading days; covers 220-bar warmup
 
     all_closes = data_layer.get_close_prices(universe, data_start, end_date)
-    ohlc_by_sym = data_layer.get_ohlc_bars(universe, start_date, end_date)
+    ohlc_by_sym = data_layer.get_ohlc_bars(universe, data_start, end_date)
     all_opens: pd.DataFrame = pd.DataFrame(
         {sym: df["open"] for sym, df in ohlc_by_sym.items() if not df.empty}
     )
@@ -274,6 +274,12 @@ def run_simulation(
     snapshots: list[DaySnapshot] = []
     open_trades: dict[str, TradeRecord] = {}
     closed_trades: list[TradeRecord] = []
+
+    # Single view object reused across all days; advance_to() moves the date forward.
+    view = BacktestMarketDataView(
+        data_layer, trading_days[0],
+        bar_cache=ohlc_by_sym, close_cache=all_closes,
+    )
 
     for i, sim_date in enumerate(trading_days):
         ts_date = pd.Timestamp(sim_date)
@@ -408,7 +414,7 @@ def run_simulation(
             if today_closes.get(s) is not None and not pd.isna(today_closes.get(s))
         ]
 
-        view = BacktestMarketDataView(data_layer, sim_date)
+        view.advance_to(sim_date)
         strategy_positions = {
             sym: Position(sym, pos.qty, pos.avg_cost)
             for sym, pos in positions.items()

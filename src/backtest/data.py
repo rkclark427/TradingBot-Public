@@ -265,15 +265,26 @@ class BacktestMarketDataView:
     Enforces no-lookahead: any query for data beyond self._as_of raises
     LookaheadError. This guarantees that a strategy behaves identically
     whether it is running live or in backtest.
+
+    Pass bar_cache and close_cache (pre-fetched by the engine) to serve all
+    data from in-memory DataFrames instead of making per-call SQL queries.
     """
 
     def __init__(
         self,
         data_layer: BacktestDataLayer,
         as_of: date,
+        bar_cache: dict[str, pd.DataFrame] | None = None,
+        close_cache: pd.DataFrame | None = None,
     ) -> None:
         self._data = data_layer
         self._as_of = as_of
+        self._bar_cache = bar_cache
+        self._close_cache = close_cache
+
+    def advance_to(self, sim_date: date) -> None:
+        """Move the simulation date forward by one day. Called once per loop iteration."""
+        self._as_of = sim_date
 
     def _check_lookahead(self, requested: date) -> None:
         if requested > self._as_of:
@@ -290,20 +301,40 @@ class BacktestMarketDataView:
         """Return a DataFrame of daily bars for *symbol* ending on *as_of*.
 
         Raises LookaheadError if as_of is after the view's simulation date.
+        Served from bar_cache when available; falls back to SQL otherwise.
         """
         as_of_date = as_of.date() if hasattr(as_of, "date") else as_of  # type: ignore[union-attr]
         self._check_lookahead(as_of_date)
 
-        # Fetch more calendar days than lookback_days to account for weekends/holidays
+        if self._bar_cache is not None:
+            df = self._bar_cache.get(symbol, pd.DataFrame())
+            if not df.empty:
+                return df.loc[df.index <= pd.Timestamp(as_of_date)].tail(lookback_days)
+            return df
+
+        # Fallback: per-call SQL query (used when no cache is provided)
         from datetime import timedelta
         start = as_of_date - timedelta(days=lookback_days * 2)
         bars = self._data.get_ohlc_bars([symbol], start, as_of_date)
         df = bars.get(symbol, pd.DataFrame())
-        # Return only the requested number of trading days
         return df.tail(lookback_days)
 
     def get_latest_price(self, symbol: str) -> Decimal:
-        """Return the most recent adjusted close on or before the simulation date."""
+        """Return the most recent adjusted close on or before the simulation date.
+
+        Served from close_cache when available; falls back to SQL otherwise.
+        """
+        if self._close_cache is not None:
+            if symbol not in self._close_cache.columns:
+                raise ValueError(f"No price data for {symbol} as of {self._as_of}")
+            series = self._close_cache.loc[
+                self._close_cache.index <= pd.Timestamp(self._as_of), symbol
+            ].dropna()
+            if series.empty:
+                raise ValueError(f"No price data for {symbol} as of {self._as_of}")
+            return Decimal(str(series.iloc[-1]))
+
+        # Fallback: full-history SQL query (used when no cache is provided)
         closes = self._data.get_close_prices([symbol], date(2000, 1, 1), self._as_of)
         series = closes[symbol].dropna()
         if series.empty:

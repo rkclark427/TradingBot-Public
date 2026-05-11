@@ -81,10 +81,12 @@ class Orchestrator:
         if strategy_registry is None:
             from src.strategies.buy_and_hold import BuyAndHoldSPY
             from src.strategies.momentum_continuation import MomentumContinuation
+            from src.strategies.short_term_mean_reversion import ShortTermMeanReversion
 
             self._strategies: dict[str, Strategy] = {
                 "buy_and_hold": BuyAndHoldSPY(),
                 "momentum_continuation": MomentumContinuation(),
+                "short_term_mean_reversion": ShortTermMeanReversion(),
             }
         else:
             self._strategies = strategy_registry

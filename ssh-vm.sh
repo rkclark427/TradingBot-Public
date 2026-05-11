@@ -8,4 +8,4 @@ ssh -t \
     -o ServerAliveInterval=60 \
     -o ServerAliveCountMax=10 \
     azureuser@172.169.207.235 \
-    "cd trading-bot && exec bash -l"
+    "cd trading-bot && source .venv/bin/activate && exec bash -l"

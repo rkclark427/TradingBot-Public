@@ -64,7 +64,13 @@
       "Bash(python -m pytest tests/test_short_term_mean_reversion.py -v --tb=short)",
       "Bash(ssh azureuser@172.169.207.235 \"cd ~/TradingBot && git pull origin main && ~/.local/bin/uv sync\")",
       "Read(//c/Users/rober/.ssh/**)",
-      "Bash(ssh openclaw *)"
+      "Bash(ssh openclaw *)",
+      "Bash(python -m pytest tests/test_short_term_mean_reversion.py -q)",
+      "Bash(ssh -o ConnectTimeout=30 openclaw \"echo ok\")",
+      "Bash(python -m pytest tests/ -q --co)",
+      "Bash(python -m pytest tests/test_backtest_data.py tests/test_engine.py -v)",
+      "Bash(scp -i \"c:\\\\Users\\\\rober\\\\OneDrive\\\\Documents\\\\GitHub\\\\TradingBot\\\\OpenClaw_key.pem\" -o StrictHostKeyChecking=no \"azureuser@172.169.207.235:~/trading-bot/backtests/stmr_2018_baseline/report.html\" \"c:\\\\Users\\\\rober\\\\OneDrive\\\\Documents\\\\GitHub\\\\TradingBot\\\\backtests\\\\stmr_2018_baseline_report.html\")",
+      "Bash(start \"\" \"c:\\\\Users\\\\rober\\\\OneDrive\\\\Documents\\\\GitHub\\\\TradingBot\\\\backtests\\\\stmr_2018_baseline_report.html\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\rober\\.claude\\projects\\c--Users-rober-OneDrive-Documents-GitHub-TradingBot\\memory",

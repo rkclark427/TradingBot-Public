@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backtest: ShortTermMeanReversion</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a1a;line-height:1.5}
+.container{max-width:1400px;margin:0 auto;padding:24px}
+h1{font-size:1.75rem;margin-bottom:4px}
+.subtitle{color:#555;margin-bottom:24px;font-size:.95rem}
+section{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:24px;margin-bottom:24px}
+h2{font-size:1.2rem;margin-bottom:16px;color:#111;border-bottom:2px solid #e8e8e8;padding-bottom:8px}
+h3{font-size:1rem;margin:16px 0 8px;color:#333}
+table{border-collapse:collapse;width:100%;font-size:.875rem}
+th{background:#f7f7f7;font-weight:600;border:1px solid #e0e0e0;padding:8px 12px;text-align:left}
+td{border:1px solid #e0e0e0;padding:8px 12px}
+tr:hover td{background:#fafafa}
+.pos{color:#2e7d32;font-weight:500}
+.neg{color:#c62828;font-weight:500}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-bottom:16px}
+.info-card{background:#f8f9fa;border:1px solid #e8e8e8;border-radius:6px;padding:12px 16px}
+.info-card .label{font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:#666;margin-bottom:4px}
+.info-card .value{font-size:1rem;font-weight:600}
+.params-table{max-width:480px;margin-top:12px}
+.caveats{background:#fff8e1;border-left:4px solid #f9a825}
+.caveats h2{color:#b45309;border-bottom-color:#f9a825}
+.caveats h3{color:#78350f;margin-top:20px}
+.caveats ul{padding-left:1.5em}
+.caveats li{margin:8px 0;font-size:.9rem}
+.caveat-best-practices{margin-top:20px}
+small{color:#666;font-size:.85em;font-weight:normal}
+p{margin:8px 0}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Backtest Report: ShortTermMeanReversion</h1>
+<p class="subtitle">
+  2018-01-01 → 2026-05-08
+  &nbsp;|&nbsp; $10,000.00 starting capital
+  &nbsp;|&nbsp; 5.0 bps slippage
+  &nbsp;|&nbsp; 4.0% cash rate
+</p>
+
+<section>
+<h2>Run Details</h2>
+<div class="info-grid">
+  <div class="info-card"><div class="label">Cache version</div><div class="value">2026-05-08 14:22 UTC</div></div>
+  <div class="info-card"><div class="label">Run timestamp</div><div class="value">2026-05-09 12:39 UTC</div></div>
+  <div class="info-card"><div class="label">Code version</div><div class="value">99b5cf5</div></div>
+  <div class="info-card"><div class="label">Trading days</div><div class="value">2099</div></div>
+</div>
+
+<h3>Strategy Parameters</h3>
+<table class="params-table">
+
+<tr><th>lookback_days</th><td>210</td></tr>
+
+<tr><th>entry_rsi_threshold</th><td>10</td></tr>
+
+<tr><th>exit_rsi_threshold</th><td>70</td></tr>
+
+<tr><th>hard_stop_pct</th><td>0.08</td></tr>
+
+<tr><th>time_stop_days</th><td>15</td></tr>
+
+<tr><th>risk_per_trade_pct</th><td>0.01</td></tr>
+
+<tr><th>max_position_pct</th><td>0.2</td></tr>
+
+<tr><th>max_concurrent_positions</th><td>8</td></tr>
+
+<tr><th>max_total_deployment_pct</th><td>1.0</td></tr>
+
+<tr><th>drawdown_circuit_breaker_pct</th><td>0.15</td></tr>
+
+</table>
+
+</section>
+
+<section>
+<h2>Equity Curve</h2>
+<p><em>Install plotly to view charts.</em></p>
+</section>
+
+<section>
+<h2>Drawdown</h2>
+<p><em>Install plotly to view charts.</em></p>
+</section>
+
+<section>
+<h2>Summary Statistics</h2>
+<table><thead><tr><th>Metric</th><th>ShortTermMeanReversion</th><th>buy_and_hold</th></tr></thead><tbody><tr><th>Total return</th><td><span class="pos">72.16%</span></td><td><span class="pos">211.08%</span></td></tr>
+<tr><th>Annualized return</th><td><span class="pos">6.74%</span></td><td><span class="pos">14.60%</span></td></tr>
+<tr><th>Annualized volatility</th><td><span class="neg">15.02%</span></td><td><span class="neg">19.26%</span></td></tr>
+<tr><th>Sharpe ratio</th><td><span class="pos">0.18</span></td><td><span class="pos">0.55</span></td></tr>
+<tr><th>Sortino ratio</th><td><span class="pos">0.17</span></td><td><span class="pos">0.52</span></td></tr>
+<tr><th>Maximum drawdown</th><td><span class="pos">-23.76%</span></td><td><span class="pos">-33.72%</span></td></tr>
+<tr><th>Calmar ratio</th><td><span class="pos">0.28</span></td><td><span class="pos">0.43</span></td></tr>
+<tr><th>Win rate</th><td><span class="pos">65.32%</span></td><td><span class="pos">100.00%</span></td></tr>
+<tr><th>Profit factor</th><td><span class="pos">1.13</span></td><td>∞</td></tr>
+<tr><th>Avg winner / loser</th><td><span class="pos">2.25%</span> / <span class="neg">-3.71%</span></td><td><span class="pos">211.08%</span> / <span class="neg">—</span></td></tr>
+<tr><th>Number of trades</th><td>2235</td><td>1</td></tr>
+<tr><th>Avg trade duration</th><td>7.4 days</td><td>3047.0 days</td></tr>
+<tr><th>Time underwater</th><td><span class="neg">93.66%</span></td><td><span class="neg">85.42%</span></td></tr>
+<tr><th>Longest losing streak</th><td>11</td><td>0</td></tr></tbody></table>
+</section>
+
+<section>
+<h2>Monthly Returns (ShortTermMeanReversion)</h2>
+<p><em>Install plotly to view charts.</em></p>
+</section>
+
+<section>
+<h2>Trade Log <small>(first 50 of 2235 — see trade_log.csv for all)</small></h2>
+<table><thead><tr><th>Entry date</th><th>Exit date</th><th>Symbol</th><th>Entry price</th><th>Exit price</th><th>Shares</th><th>P&amp;L ($)</th><th>P&amp;L (%)</th><th>Exit reason</th></tr></thead><tbody><tr><td>2018-01-03</td><td>2018-01-04</td><td>JNJ</td><td>$110.9230</td><td>$111.6789</td><td>11.2870</td><td class="pos">$+8.53</td><td class="pos">+0.68%</td><td>strategy</td></tr>
+<tr><td>2018-01-03</td><td>2018-01-05</td><td>MS</td><td>$40.7274</td><td>$41.3868</td><td>30.7768</td><td class="pos">$+20.29</td><td class="pos">+1.62%</td><td>strategy</td></tr>
+<tr><td>2018-01-03</td><td>2018-01-05</td><td>HD</td><td>$153.8452</td><td>$156.0868</td><td>8.1291</td><td class="pos">$+18.22</td><td class="pos">+1.46%</td><td>strategy</td></tr>
+<tr><td>2018-01-03</td><td>2018-01-09</td><td>PG</td><td>$72.3807</td><td>$72.8981</td><td>17.2964</td><td class="pos">$+8.95</td><td class="pos">+0.71%</td><td>strategy</td></tr>
+<tr><td>2018-01-04</td><td>2018-01-09</td><td>NEE</td><td>$30.8504</td><td>$31.2346</td><td>40.5235</td><td class="pos">$+15.57</td><td class="pos">+1.25%</td><td>strategy</td></tr>
+<tr><td>2018-01-11</td><td>2018-01-12</td><td>DIS</td><td>$104.8042</td><td>$105.7156</td><td>12.0175</td><td class="pos">$+10.95</td><td class="pos">+0.87%</td><td>strategy</td></tr>
+<tr><td>2018-01-12</td><td>2018-01-17</td><td>PEP</td><td>$90.7869</td><td>$91.7354</td><td>13.8285</td><td class="pos">$+13.12</td><td class="pos">+1.04%</td><td>strategy</td></tr>
+<tr><td>2018-01-12</td><td>2018-01-17</td><td>CL</td><td>$61.0750</td><td>$61.8790</td><td>20.6014</td><td class="pos">$+16.56</td><td class="pos">+1.32%</td><td>strategy</td></tr>
+<tr><td>2018-01-04</td><td>2018-01-18</td><td>MO</td><td>$38.2861</td><td>$37.9174</td><td>32.7715</td><td class="neg">$-12.08</td><td class="neg">-0.96%</td><td>strategy</td></tr>
+<tr><td>2018-01-05</td><td>2018-01-18</td><td>PLD</td><td>$50.0203</td><td>$49.8433</td><td>25.2455</td><td class="neg">$-4.47</td><td class="neg">-0.35%</td><td>strategy</td></tr>
+<tr><td>2018-01-10</td><td>2018-01-18</td><td>INTC</td><td>$36.3936</td><td>$37.2550</td><td>34.3548</td><td class="pos">$+29.59</td><td class="pos">+2.37%</td><td>strategy</td></tr>
+<tr><td>2018-01-11</td><td>2018-01-18</td><td>AVGO</td><td>$20.8254</td><td>$20.9538</td><td>60.2194</td><td class="pos">$+7.73</td><td class="pos">+0.62%</td><td>strategy</td></tr>
+<tr><td>2018-01-12</td><td>2018-01-18</td><td>PG</td><td>$71.8382</td><td>$72.4661</td><td>17.4462</td><td class="pos">$+10.95</td><td class="pos">+0.87%</td><td>strategy</td></tr>
+<tr><td>2018-01-04</td><td>2018-01-19</td><td>T</td><td>$15.6025</td><td>$15.7018</td><td>80.4925</td><td class="pos">$+7.99</td><td class="pos">+0.64%</td><td>strategy</td></tr>
+<tr><td>2018-01-17</td><td>2018-01-22</td><td>META</td><td>$177.9531</td><td>$179.3025</td><td>7.0916</td><td class="pos">$+9.57</td><td class="pos">+0.76%</td><td>strategy</td></tr>
+<tr><td>2018-01-17</td><td>2018-01-22</td><td>BMY</td><td>$44.6790</td><td>$46.0844</td><td>28.3004</td><td class="pos">$+39.77</td><td class="pos">+3.15%</td><td>strategy</td></tr>
+<tr><td>2018-01-22</td><td>2018-01-25</td><td>AXP</td><td>$87.1430</td><td>$88.9982</td><td>14.5155</td><td class="pos">$+26.93</td><td class="pos">+2.13%</td><td>strategy</td></tr>
+<tr><td>2018-01-24</td><td>2018-01-26</td><td>LIN</td><td>$139.8998</td><td>$143.7920</td><td>9.1080</td><td class="pos">$+35.45</td><td class="pos">+2.78%</td><td>strategy</td></tr>
+<tr><td>2018-01-24</td><td>2018-01-29</td><td>JNJ</td><td>$114.2182</td><td>$115.1775</td><td>11.2965</td><td class="pos">$+10.84</td><td class="pos">+0.84%</td><td>strategy</td></tr>
+<tr><td>2018-01-24</td><td>2018-01-29</td><td>UPS</td><td>$96.3111</td><td>$96.3964</td><td>13.2850</td><td class="pos">$+1.13</td><td class="pos">+0.09%</td><td>strategy</td></tr>
+<tr><td>2018-01-26</td><td>2018-01-30</td><td>TSLA</td><td>$22.7780</td><td>$22.9978</td><td>56.1796</td><td class="pos">$+12.35</td><td class="pos">+0.96%</td><td>strategy</td></tr>
+<tr><td>2018-01-18</td><td>2018-02-02</td><td>F</td><td>$7.8686</td><td>$7.1946</td><td>161.6924</td><td class="neg">$-108.98</td><td class="neg">-8.57%</td><td>hard_stop</td></tr>
+<tr><td>2018-01-25</td><td>2018-02-05</td><td>AAPL</td><td>$40.8510</td><td>$37.2065</td><td>31.3261</td><td class="neg">$-114.17</td><td class="neg">-8.92%</td><td>hard_stop</td></tr>
+<tr><td>2018-01-25</td><td>2018-02-05</td><td>AVGO</td><td>$20.3648</td><td>$18.5242</td><td>62.9497</td><td class="neg">$-115.87</td><td class="neg">-9.04%</td><td>hard_stop</td></tr>
+<tr><td>2018-02-05</td><td>2018-02-08</td><td>BKNG</td><td>$72.3375</td><td>$73.9492</td><td>16.7419</td><td class="pos">$+26.98</td><td class="pos">+2.23%</td><td>strategy</td></tr>
+<tr><td>2018-01-25</td><td>2018-02-09</td><td>TXN</td><td>$87.6055</td><td>$79.0004</td><td>14.7375</td><td class="neg">$-126.82</td><td class="neg">-9.82%</td><td>hard_stop</td></tr>
+<tr><td>2018-01-26</td><td>2018-02-09</td><td>FDX</td><td>$233.2523</td><td>$204.5460</td><td>5.4337</td><td class="neg">$-155.98</td><td class="neg">-12.31%</td><td>hard_stop</td></tr>
+<tr><td>2018-01-30</td><td>2018-02-09</td><td>CAT</td><td>$134.7340</td><td>$124.8442</td><td>9.2752</td><td class="neg">$-91.73</td><td class="neg">-7.34%</td><td>hard_stop</td></tr>
+<tr><td>2018-02-02</td><td>2018-02-09</td><td>UPS</td><td>$86.4845</td><td>$78.4909</td><td>14.3878</td><td class="neg">$-115.01</td><td class="neg">-9.24%</td><td>hard_stop</td></tr>
+<tr><td>2018-01-29</td><td>2018-02-13</td><td>SBUX</td><td>$48.0476</td><td>$46.3312</td><td>26.3894</td><td class="neg">$-45.29</td><td class="neg">-3.57%</td><td>strategy</td></tr>
+<tr><td>2018-02-08</td><td>2018-02-13</td><td>NEE</td><td>$30.0706</td><td>$30.4677</td><td>39.6767</td><td class="pos">$+15.76</td><td class="pos">+1.32%</td><td>strategy</td></tr>
+<tr><td>2018-01-29</td><td>2018-02-14</td><td>CL</td><td>$60.2832</td><td>$57.2451</td><td>21.1508</td><td class="neg">$-64.26</td><td class="neg">-5.04%</td><td>strategy</td></tr>
+<tr><td>2018-02-08</td><td>2018-02-15</td><td>EOG</td><td>$78.1636</td><td>$78.5126</td><td>15.3413</td><td class="pos">$+5.35</td><td class="pos">+0.45%</td><td>strategy</td></tr>
+<tr><td>2018-02-09</td><td>2018-02-15</td><td>COP</td><td>$41.0023</td><td>$42.8078</td><td>28.3794</td><td class="pos">$+51.24</td><td class="pos">+4.40%</td><td>strategy</td></tr>
+<tr><td>2018-02-09</td><td>2018-02-15</td><td>ABT</td><td>$48.9075</td><td>$50.6619</td><td>23.8163</td><td class="pos">$+41.78</td><td class="pos">+3.59%</td><td>strategy</td></tr>
+<tr><td>2018-02-22</td><td>2018-02-23</td><td>LOW</td><td>$82.4405</td><td>$83.4817</td><td>14.4293</td><td class="pos">$+15.02</td><td class="pos">+1.26%</td><td>strategy</td></tr>
+<tr><td>2018-02-09</td><td>2018-02-26</td><td>SLB</td><td>$54.2850</td><td>$53.4115</td><td>21.5674</td><td class="neg">$-18.84</td><td class="neg">-1.61%</td><td>strategy</td></tr>
+<tr><td>2018-02-22</td><td>2018-02-27</td><td>QCOM</td><td>$50.9852</td><td>$54.5034</td><td>23.0749</td><td class="pos">$+81.18</td><td class="pos">+6.90%</td><td>strategy</td></tr>
+<tr><td>2018-02-22</td><td>2018-02-27</td><td>VZ</td><td>$30.7491</td><td>$31.2086</td><td>38.6443</td><td class="pos">$+17.76</td><td class="pos">+1.49%</td><td>strategy</td></tr>
+<tr><td>2018-02-23</td><td>2018-02-27</td><td>GILD</td><td>$58.7838</td><td>$60.1671</td><td>20.2172</td><td class="pos">$+27.97</td><td class="pos">+2.35%</td><td>strategy</td></tr>
+<tr><td>2018-02-23</td><td>2018-02-27</td><td>WFC</td><td>$47.3488</td><td>$48.0702</td><td>25.0781</td><td class="pos">$+18.09</td><td class="pos">+1.52%</td><td>strategy</td></tr>
+<tr><td>2018-03-01</td><td>2018-03-06</td><td>LIN</td><td>$131.2033</td><td>$135.1844</td><td>9.1522</td><td class="pos">$+36.44</td><td class="pos">+3.03%</td><td>strategy</td></tr>
+<tr><td>2018-03-02</td><td>2018-03-07</td><td>NVDA</td><td>$5.6394</td><td>$5.8845</td><td>207.5920</td><td class="pos">$+50.88</td><td class="pos">+4.35%</td><td>strategy</td></tr>
+<tr><td>2018-03-02</td><td>2018-03-08</td><td>HON</td><td>$112.0553</td><td>$115.7992</td><td>10.5825</td><td class="pos">$+39.62</td><td class="pos">+3.34%</td><td>strategy</td></tr>
+<tr><td>2018-02-22</td><td>2018-03-12</td><td>WMT</td><td>$26.7730</td><td>$26.1023</td><td>44.0733</td><td class="neg">$-29.56</td><td class="neg">-2.51%</td><td>strategy</td></tr>
+<tr><td>2018-03-01</td><td>2018-03-12</td><td>LOW</td><td>$76.9027</td><td>$74.8359</td><td>15.6675</td><td class="neg">$-32.38</td><td class="neg">-2.69%</td><td>strategy</td></tr>
+<tr><td>2018-03-01</td><td>2018-03-12</td><td>EOG</td><td>$75.0450</td><td>$75.4929</td><td>16.1175</td><td class="pos">$+7.22</td><td class="pos">+0.60%</td><td>strategy</td></tr>
+<tr><td>2018-03-02</td><td>2018-03-12</td><td>C</td><td>$55.6646</td><td>$57.7218</td><td>21.2901</td><td class="pos">$+43.80</td><td class="pos">+3.70%</td><td>strategy</td></tr>
+<tr><td>2018-03-06</td><td>2018-03-12</td><td>NKE</td><td>$58.6751</td><td>$59.9108</td><td>20.6423</td><td class="pos">$+25.51</td><td class="pos">+2.11%</td><td>strategy</td></tr>
+<tr><td>2018-03-08</td><td>2018-03-19</td><td>TGT</td><td>$57.0693</td><td>$56.6053</td><td>21.1335</td><td class="neg">$-9.81</td><td class="neg">-0.81%</td><td>strategy</td></tr></tbody></table>
+</section>
+
+<section>
+<h2>Universe Diagnostics</h2>
+<p><strong>Simulation period:</strong> 2018-01-02 → 2026-05-08 (2099 trading days)</p>
+<p><strong>Universe size:</strong> max 84 symbols, min 84 symbols</p>
+<p>Universe size was constant throughout the simulation period.</p>
+<p><strong>Symbols traded:</strong> AAPL, ABBV, ABT, ACN, AMD, AMGN, AMT, AMZN, APD, AVGO, AXP, BA, BAC, BKNG, BLK, BMY, BRK-B, C, CAT, CB, CL, CMCSA, COP, COST, CSCO, CVS, CVX, DE, DIS, DUK, EL, EOG, F, FDX, GE, GILD, GOOG, GOOGL, GS, HD, HON, IBM, INTC, JNJ, JPM, KO, LIN, LMT, LOW, MCD, MDT, META, MMM, MO, MRK, MS, MSFT, NEE, NFLX, NKE, NVDA, ORCL, PEP, PFE, PG, PLD, PM, QCOM, RTX, SBUX, SLB, SO, T, TGT, TMO, TSLA, TXN, UNH, UPS, USB, VZ, WFC, WMT, XOM</p>
+</section>
+
+<section class="caveats">
+<h2>⚠ Data Integrity Caveats</h2>
+
+<h3>What this backtest cannot tell you</h3>
+<ul>
+<li><strong>Past performance does not predict future returns.</strong>
+A strategy that worked in 2018–2025 may not work in 2026–2030.
+Markets change, factor premia decay, and strategies that have entered the public domain are arbitraged.</li>
+
+<li><strong>Live execution will be worse than backtest execution.</strong>
+Slippage, partial fills, exchange outages, broker errors, and timing discrepancies all degrade live performance
+vs. the simulated execution. Plan for live results to be 1–3% annualized worse than backtest results,
+even if everything works correctly.</li>
+
+<li><strong>Single-period results are noisy.</strong>
+An 8-year backtest is not enough data to confidently estimate the strategy's long-run characteristics.
+The Sharpe ratio computed from this backtest has a standard error roughly equal to the Sharpe itself —
+a Sharpe of 0.8 might really be 0.0 to 1.6.</li>
+
+<li><strong>Multiple-testing risk.</strong>
+If the strategy or its parameters were chosen with knowledge of historical performance, the backtest is
+contaminated by selection bias. The first time a strategy is run on historical data, results are informative.
+After that, every parameter tweak that produces "better" results on the same data is at risk of fitting noise.</li>
+
+<li><strong>yfinance data has known imperfections.</strong>
+Occasional gaps, late dividend adjustments, and rare price errors are present.
+These are unlikely to materially change conclusions but are not zero.</li>
+
+<li><strong>Survivorship bias is minimal but not zero.</strong>
+Our 16-ETF universe is currently complete (none have been delisted), but the universe was chosen with
+knowledge that these ETFs have all survived. A truly survivorship-bias-free backtest would also include
+ETFs that were active at the start of the period but have since been delisted.</li>
+
+<li><strong>Slippage and cash interest are simulated, not measured.</strong>
+The default 5 bps slippage and 4% cash rate are reasonable for the current environment.
+Real values vary over time and can change conclusions if the strategy is sensitive to either.</li>
+
+<li><strong>This is not investment advice.</strong>
+Backtests are a tool for understanding strategy behavior, not a basis for sizing real-money positions.
+Strategy decisions are the user's responsibility.</li>
+</ul>
+
+<div class="caveat-best-practices">
+<h3>Best practices</h3>
+<ul>
+<li>Run the backtest exactly once on out-of-sample data before any parameter tuning.
+That result is the closest thing to ground truth the harness can provide.</li>
+<li>If parameter tuning is performed, do it on a train subset (e.g., 2018–2022),
+then re-validate on a held-out period (e.g., 2023–2025) without further tuning.</li>
+<li>Treat backtest results as a "might work" signal, not a "will work" guarantee.
+Promotion to paper trading is the next validation step; live is the step after that.</li>
+<li>Compare to multiple benchmarks, not just buy-and-hold.
+A strategy that beats SPY but loses to 60/40 may be taking on uncompensated risk.</li>
+<li>Pay attention to drawdown and time underwater, not just total return.
+A strategy with high return and brutal drawdowns may be psychologically untradable in real life.</li>
+</ul>
+</div>
+
+</section>
+
+</div>
+</body>
+</html>

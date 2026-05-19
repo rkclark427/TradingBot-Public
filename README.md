@@ -29,9 +29,6 @@ Active development. Phase 1 (foundation + sleeve architecture) in progress. See 
 ## Documentation
 
 - [Architecture](docs/architecture.md) — full system design, components, data model, build sequence
-- [Decisions](docs/decisions.md) — design decision log with rationale
-- [Phase 1 tasks](docs/phases/phase-1.md) — current build phase
-- [CLAUDE.md](CLAUDE.md) — primer for Claude Code
 
 ## Quick start (eventual)
 

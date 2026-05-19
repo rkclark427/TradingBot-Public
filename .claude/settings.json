@@ -70,7 +70,9 @@
       "Bash(python -m pytest tests/ -q --co)",
       "Bash(python -m pytest tests/test_backtest_data.py tests/test_engine.py -v)",
       "Bash(scp -i \"c:\\\\Users\\\\rober\\\\OneDrive\\\\Documents\\\\GitHub\\\\TradingBot\\\\OpenClaw_key.pem\" -o StrictHostKeyChecking=no \"azureuser@172.169.207.235:~/trading-bot/backtests/stmr_2018_baseline/report.html\" \"c:\\\\Users\\\\rober\\\\OneDrive\\\\Documents\\\\GitHub\\\\TradingBot\\\\backtests\\\\stmr_2018_baseline_report.html\")",
-      "Bash(start \"\" \"c:\\\\Users\\\\rober\\\\OneDrive\\\\Documents\\\\GitHub\\\\TradingBot\\\\backtests\\\\stmr_2018_baseline_report.html\")"
+      "Bash(start \"\" \"c:\\\\Users\\\\rober\\\\OneDrive\\\\Documents\\\\GitHub\\\\TradingBot\\\\backtests\\\\stmr_2018_baseline_report.html\")",
+      "Bash(python -m pytest --co -q)",
+      "Bash(python -m pytest --co -q tests/)"
     ],
     "additionalDirectories": [
       "c:\\Users\\rober\\.claude\\projects\\c--Users-rober-OneDrive-Documents-GitHub-TradingBot\\memory",

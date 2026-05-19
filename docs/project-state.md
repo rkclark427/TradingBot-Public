@@ -1,5 +1,5 @@
 # TradingBot — Project State Document
-*Last updated: 2026-05-07 | 270 tests passing | Phase 2 complete*
+*Last updated: 2026-05-17 | 301 tests passing | Phase 2 complete + STMR added*
 
 ---
 
@@ -230,7 +230,7 @@ Status semantics:
 
 **`_run_sleeve_cycle(sleeve, as_of, asset_universe)`**:
 1. Circuit breaker check: if RUNNING and `drawdown_pct ≥ drawdown_circuit_breaker_pct` → `halt_sleeve()` and continue as HALTED
-2. Look up strategy from registry
+2. Look up strategy from registry (`buy_and_hold`, `momentum_continuation`, `short_term_mean_reversion`)
 3. Load current positions from DB
 4. Load `strategy_state` from DB; update `days_held` (once per trading session via `last_session_date` gate) and `highest_close_since_entry` (current market price); save; build `position_state` dict; prefetch prices for held symbols
 5. Call `strategy.generate_targets(position_state=position_state)`
@@ -263,7 +263,7 @@ Status semantics:
 
 ---
 
-## Phase 2 — Backtest + MomentumContinuation (complete)
+## Phase 2 — Backtest + MomentumContinuation + ShortTermMeanReversion (complete)
 
 ### 1. Backtest data layer (`src/backtest/`)
 
@@ -280,11 +280,17 @@ Status semantics:
 - `get_cache_version()` → most recent `fetched_at` timestamp, or None if empty
 - `get_latest_trade_date()` → most recent `trade_date` across all cached symbols, or None
 
-`BacktestMarketDataView(layer, as_of: date)`:
+`BacktestMarketDataView(layer, as_of: date, bar_cache, close_cache)`:
 - Implements `MarketDataView` protocol (same interface as live `AlpacaMarketDataView`)
 - Raises `LookaheadError` if any query requests data beyond `as_of`
-- `get_bars(symbol, lookback_days, as_of)` → DataFrame
-- `get_latest_price(symbol)` → `Decimal` (adjusted close on or before simulation date)
+- `get_bars(symbol, lookback_days, as_of)` → DataFrame — served from `bar_cache` (in-memory), no SQL
+- `get_latest_price(symbol)` → `Decimal` (adjusted close on or before simulation date) — served from `close_cache`
+- `advance_to(sim_date)` — moves the view forward to a new simulation date (replaces per-day constructor calls)
+- Bar/close caches are pre-fetched once by the engine before the simulation loop, not rebuilt each day
+
+**Performance**: this design eliminates per-day SQL queries. A full 2018–2026 STMR run (88 symbols × ~2100 trading days) previously issued ~21K SQL queries in the hot path; now it issues one bulk fetch at startup. Runtime dropped from ~48 min to ~2 min.
+
+**Data warmup**: engine extends start by 500 calendar days (not 180) so OHLC bars include enough history for a 200-bar SMA on the first simulation day.
 
 **Note on yfinance**: version 1.x (1.3.0 installed) returns a tz-aware `DatetimeIndex`. The data layer normalizes with `.tz_localize(None).normalize()` before the `.date` cast.
 
@@ -401,11 +407,64 @@ Canonical caveats text per spec §8 (look-ahead risk, data-snooping warning, no 
 
 **Config model** (`src/backtest/config.py`): `BacktestConfig` (Pydantic v2) with `StrategyConfig` (alias for `class` field — Python keyword workaround), `SimulationConfig`, `OutputConfig`. `end_date: null` resolves to `get_latest_trade_date()` at runtime.
 
-**Strategy registry** (`_STRATEGY_REGISTRY`): maps YAML class names to `(module, class_attr)`. **`UNIVERSE_MAP`**: maps class names to the symbol list used for both strategy universe and benchmark data refresh.
+**Strategy registry** (`_STRATEGY_REGISTRY`): maps YAML class names to `(module, class_attr)`. **`UNIVERSE_MAP`**: maps class names to the symbol list used for both strategy universe and benchmark data refresh. Both `MomentumContinuation` and `ShortTermMeanReversion` are registered.
 
-**Default config**: `backtest_configs/momentum_2018_baseline.yaml` — MomentumContinuation baseline, 2018-01-01 to latest cache date, $10k capital, 5bps slippage.
+**`refresh-data --all`**: derives the symbol list from `UNIVERSE_MAP` dynamically, so all registered strategies are covered. Previously hardcoded to the 16-ETF momentum universe.
 
-### 7. strategy_state — live position tracking (`src/tracking/`)
+**Backtest configs**:
+- `backtest_configs/momentum_2018_baseline.yaml` — MomentumContinuation baseline, 2018-01-01 to latest cache, $10k capital, 5bps slippage
+- `backtest_configs/momentum_2018_trailing8.yaml` — MomentumContinuation tuning variant (trailing stop at 8%)
+- `backtest_configs/stmr_2018_baseline.yaml` — ShortTermMeanReversion baseline, same date range and capital
+
+### 7. ShortTermMeanReversion strategy (`src/strategies/short_term_mean_reversion.py`)
+
+**Universe** (fixed in code — 88 S&P 100 large-caps continuously traded 2018–2026, survivorship-bias-constrained):
+- Technology: AAPL, MSFT, GOOGL, GOOG, META, NVDA, AVGO, TXN, QCOM, IBM, ORCL, ACN, CSCO, INTC, AMD
+- Consumer Discretionary: AMZN, TSLA, HD, MCD, NKE, SBUX, TGT, LOW, BKNG, F
+- Consumer Staples: WMT, PG, KO, PEP, COST, CL, MO, PM, EL
+- Healthcare: JNJ, UNH, PFE, MRK, ABBV, TMO, ABT, MDT, BMY, AMGN, GILD, CVS
+- Financials: BRK-B, JPM, BAC, WFC, GS, MS, BLK, AXP, USB, C, MMC, CB
+- Industrials: HON, UPS, BA, CAT, DE, MMM, GE, LMT, RTX, FDX
+- Energy: XOM, CVX, COP, SLB, EOG
+- Materials/Utilities/Real Estate: LIN, APD, NEE, DUK, SO, AMT, PLD
+- Communication Services: VZ, T, DIS, CMCSA, NFLX
+
+**Entry signal**: `RSI(2) < entry_rsi_threshold` AND `close > 200-day SMA`. Candidates ranked by RSI ascending (most oversold first) when position slots are limited.
+
+**Exit signals** (first trigger wins):
+1. **Hard stop**: `current_price < entry_price × (1 − 0.08)` — wide by design; deeper oversold is more opportunity, not failure
+2. **RSI exit**: `RSI(2) > exit_rsi_threshold` (mean reversion complete)
+3. **Time stop**: `days_held ≥ time_stop_days`
+
+**Position sizing**: `entry_weight = risk_per_trade_pct / hard_stop_pct = 0.01 / 0.08 = 0.125`. Each position targets 12.5% of NAV, bounded by `max_position_pct`. At an 8% stop, a stop-out loses ~1% of NAV.
+
+**Constraints**:
+- Max 8 concurrent positions
+- Max 100% total deployment
+- No short selling, no options
+
+**RSI implementation**: Wilder RSI using EWM smoothing. When `avg_loss = 0` (no losing periods), the direct-division path returns `inf`, which produces `RSI = 100` (overbought) correctly via `100 - 100/(1+inf)`. When `avg_gain = avg_loss = 0` (flat price), the result is `NaN`, treated as ineligible for entry/exit.
+
+**Parameters** (all in `config/strategies/short_term_mean_reversion.yaml`, overridable per sleeve):
+
+| Parameter | Default |
+|-----------|---------|
+| `lookback_days` | 210 |
+| `entry_rsi_threshold` | 10 |
+| `exit_rsi_threshold` | 70 |
+| `hard_stop_pct` | 0.08 |
+| `time_stop_days` | 15 |
+| `risk_per_trade_pct` | 0.01 |
+| `max_position_pct` | 0.20 |
+| `max_concurrent_positions` | 8 |
+| `max_total_deployment_pct` | 1.00 |
+| `drawdown_circuit_breaker_pct` | 0.15 |
+
+Minimum `lookback_days` is enforced at 210 (200 bars for SMA + RSI(2) warmup). Raises `ValueError` if set lower.
+
+**Baseline backtest config**: `backtest_configs/stmr_2018_baseline.yaml` — 2018-01-01 to latest cache date, $10k capital, 5bps slippage.
+
+### 8. strategy_state — live position tracking (`src/tracking/`)
 
 `strategy_state` table: `(sleeve_id, symbol)` composite PK, plus `entry_date`, `entry_price`, `days_held`, `highest_close_since_entry`, `last_session_date`.
 
@@ -450,6 +509,7 @@ Two paper BuyAndHoldSPY sleeves ran against Alpaca paper during market hours. Bo
 | Asset universe | ✓ |
 | Strategy interface + BuyAndHoldSPY | ✓ |
 | MomentumContinuation (25 tests) | ✓ |
+| ShortTermMeanReversion (31 tests) | ✓ |
 | Sleeve manager (lifecycle, NAV, fills) | ✓ |
 | Portfolio sizer | ✓ |
 | Execution router (submit, net, poll) | ✓ |
@@ -460,4 +520,4 @@ Two paper BuyAndHoldSPY sleeves ran against Alpaca paper during market hours. Bo
 | Backtest reporting (28 tests) | ✓ |
 | Backtest config model | ✓ |
 | strategy_state repo + attribute_fill (12 tests) | ✓ |
-| **Total** | **270** |
+| **Total** | **301** |
